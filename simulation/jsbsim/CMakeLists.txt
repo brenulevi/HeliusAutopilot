@@ -20,3 +20,18 @@ target_link_libraries(jsbsim_simulation
     PUBLIC helius
     PRIVATE libJSBSim
 )
+
+add_custom_command(TARGET jsbsim_simulation POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/resources/aircraft
+        $<TARGET_FILE_DIR:jsbsim_simulation>/aircraft
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/resources/engine
+        $<TARGET_FILE_DIR:jsbsim_simulation>/engine
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/resources/systems
+        $<TARGET_FILE_DIR:jsbsim_simulation>/systems
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/resources/data_output
+        $<TARGET_FILE_DIR:jsbsim_simulation>/data_output
+)
