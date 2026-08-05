@@ -1,0 +1,33 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "jsbsim",
+            "binaryDir": "${sourceDir}/build/jsbsim",
+            "cacheVariables": {
+                "BUILD_TARGET": "JSBSIM"
+            }
+        },
+        {
+            "name": "stm32",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/stm32",
+		    "toolchainFile": "${sourceDir}/firmware/cmake/gcc-arm-none-eabi.cmake",
+            "cacheVariables": {
+                "BUILD_TARGET": "STM32"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "jsbsim",
+            "configurePreset": "jsbsim",
+            "jobs": 8
+        },
+        {
+            "name": "stm32",
+            "configurePreset": "stm32",
+            "jobs": 8
+        }
+    ]
+}
