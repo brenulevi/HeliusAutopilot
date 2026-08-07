@@ -21,6 +21,7 @@ set(BUILD_TARGET "STM32" CACHE STRING "Build target for the project")
 set_property(CACHE BUILD_TARGET PROPERTY STRINGS
     JSBSIM
     STM32
+    TESTER
 )
 
 add_subdirectory(core)

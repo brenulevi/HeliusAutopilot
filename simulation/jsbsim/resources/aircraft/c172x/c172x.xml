@@ -1277,4 +1277,8 @@
         <coefficients> OFF </coefficients>
     </output>
     -->
+
+    <system file="SensorImu.xml" />
+    <system file="SensorGps.xml" />
+    <system file="SensorBaro.xml" />
 </fdm_config>
