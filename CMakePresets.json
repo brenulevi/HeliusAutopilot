@@ -5,7 +5,8 @@
             "name": "jsbsim",
             "binaryDir": "${sourceDir}/build/jsbsim",
             "cacheVariables": {
-                "BUILD_TARGET": "JSBSIM"
+                "BUILD_TARGET": "JSBSIM",
+                "HELIUS_MATH_BACKEND": "SCALAR"
             }
         },
         {
@@ -14,7 +15,18 @@
             "binaryDir": "${sourceDir}/build/stm32",
 		    "toolchainFile": "${sourceDir}/firmware/cmake/gcc-arm-none-eabi.cmake",
             "cacheVariables": {
-                "BUILD_TARGET": "STM32"
+                "BUILD_TARGET": "STM32",
+                "HELIUS_MATH_BACKEND": "SCALAR"
+            }
+        },
+        {
+            "name": "stm32-cmsis",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/stm32-cmsis",
+		    "toolchainFile": "${sourceDir}/firmware/cmake/gcc-arm-none-eabi.cmake",
+            "cacheVariables": {
+                "BUILD_TARGET": "STM32",
+                "HELIUS_MATH_BACKEND": "CMSIS"
             }
         }
     ],
@@ -27,6 +39,11 @@
         {
             "name": "stm32",
             "configurePreset": "stm32",
+            "jobs": 8
+        },
+        {
+            "name": "stm32-cmsis",
+            "configurePreset": "stm32-cmsis",
             "jobs": 8
         }
     ]

@@ -1,295 +1,638 @@
 #include "estimator.h"
-#include <stddef.h>
-#include <string.h>
+#include "mat.h"
 
-#define DEFAULT_GYRO_NOISE      2.44e-4f // rad/s/sqrt(Hz)
-#define DEFAULT_ACCEL_NOISE     1.57e-3f // m/s^2/sqrt(Hz)
-#define DEFAULT_GYRO_BIAS       1.00e-5f // rad/s^2/sqrt(Hz)
-#define DEFAULT_ACCEL_BIAS      1.00e-4f // m/s^3/sqrt(Hz)
+#include <math.h>
 
-void helius_estimator_init(helius_estimator_t *estimator, const helius_noise_config_t* noise_cfg)
+#define ACCEL_MIN_NORM_MPS2 1e-3f
+#define MAG_MIN_NORM_UT 1e-3f
+
+static float clampf(float x, float lo, float hi)
 {
-    if (estimator == NULL) return;
-
-    estimator->attitude_rad.w = 1.0f;
-    estimator->attitude_rad.x = 0.0f;
-    estimator->attitude_rad.y = 0.0f;
-    estimator->attitude_rad.z = 0.0f;
-
-    estimator->position_ned = (helius_vec3_t){0.0f, 0.0f, 0.0f};
-    estimator->velocity_mps = (helius_vec3_t){0.0f, 0.0f, 0.0f};
-
-    estimator->gyro_bias_rps  = (helius_vec3_t){0.0f, 0.0f, 0.0f};
-    estimator->accel_bias_mps2 = (helius_vec3_t){0.0f, 0.0f, 0.0f};
-
-    estimator->a_nav_prev = (helius_vec3_t){0.0f, 0.0f, 0.0f};
-
-    if (noise_cfg != NULL) {
-        estimator->noise = *noise_cfg;
-    } else {
-        estimator->noise.gyro_noise_std  = DEFAULT_GYRO_NOISE; 
-        estimator->noise.accel_noise_std = DEFAULT_ACCEL_NOISE; 
-        estimator->noise.gyro_bias_std   = DEFAULT_GYRO_BIAS; 
-        estimator->noise.accel_bias_std  = DEFAULT_ACCEL_BIAS; 
+    if (x < lo)
+    {
+        return lo;
     }
-
-    // Direct pointers to memory buffers
-    estimator->P = &estimator->P_buffer_a;
-    estimator->P_pred = &estimator->P_buffer_b;
-
-    // Clear both buffers
-    memset(&estimator->P_buffer_a, 0, sizeof(helius_cov15_t));
-    memset(&estimator->P_buffer_b, 0, sizeof(helius_cov15_t));
-
-    // Initial variances setup using estimator->P
-    float init_var_att_xy = 0.087f * 0.087f; 
-    float init_var_att_z  = 0.523f * 0.523f; 
-    float init_var_pos    = 10.0f  * 10.0f; 
-    float init_var_vel    = 1.0f   * 1.0f; 
-    float init_var_bg     = 0.05f  * 0.05f; 
-    float init_var_ba     = 0.2f   * 0.2f; 
-
-    estimator->P->p[0][0] = init_var_att_xy;
-    estimator->P->p[1][1] = init_var_att_xy;
-    estimator->P->p[2][2] = init_var_att_z;
-
-    estimator->P->p[3][3] = init_var_pos;
-    estimator->P->p[4][4] = init_var_pos;
-    estimator->P->p[5][5] = init_var_pos;
-
-    estimator->P->p[6][6] = init_var_vel;
-    estimator->P->p[7][7] = init_var_vel;
-    estimator->P->p[8][8] = init_var_vel;
-
-    estimator->P->p[9][9]   = init_var_bg;
-    estimator->P->p[10][10] = init_var_bg;
-    estimator->P->p[11][11] = init_var_bg;
-
-    estimator->P->p[12][12] = init_var_ba;
-    estimator->P->p[13][13] = init_var_ba;
-    estimator->P->p[14][14] = init_var_ba;
-
-    estimator->is_initialized = 1;
+    if (x > hi)
+    {
+        return hi;
+    }
+    return x;
 }
 
-static void predict_nominal_state(
-    helius_estimator_t* estimator, 
-    helius_vec3_t w_corr, 
-    helius_vec3_t a_corr, 
-    float dt) 
+static bool project_onto_plane(vec3_t v, vec3_t plane_normal_hat, vec3_t* v_proj_hat);
+
+static bool apply_vector_measurement_update(
+    estimator_t* e,
+    vec3_t meas_body_hat,
+    vec3_t ref_nav_hat,
+    float meas_dir_sigma,
+    float nis_gate
+)
 {
-    // Integrate gyro rates to get updated attitude using Exponential Quaternion Method
-    helius_quat_t dq = helius_quat_from_axis_angle(w_corr, dt);
-    estimator->attitude_rad = helius_quat_multiply(estimator->attitude_rad, dq);
-    estimator->attitude_rad = helius_quat_normalize(estimator->attitude_rad);
+    quat_t q_nb = quat_conjugate(e->attitude);
+    vec3_t pred_body_hat = quat_rotate_vec3(q_nb, ref_nav_hat);
+    if (!vec3_is_finite(pred_body_hat))
+    {
+        return false;
+    }
 
-    // Rotate accel to NED
-    helius_vec3_t a_nav_curr = helius_quat_rotate_vec(estimator->attitude_rad, a_corr);
+    vec3_t residual = vec3_sub(meas_body_hat, pred_body_hat);
 
-    // Remove gravity from accel to just appear specific acceleration
-    a_nav_curr.z -= HELIUS_GRAVITY;
-
-    // Calculate average acceleration
-    helius_vec3_t a_nav_avg = {
-        0.5f * (a_nav_curr.x + estimator->a_nav_prev.x),
-        0.5f * (a_nav_curr.y + estimator->a_nav_prev.y),
-        0.5f * (a_nav_curr.z + estimator->a_nav_prev.z)};
-
-    // Integrate velocity to get position
-    estimator->position_ned.x += estimator->velocity_mps.x * dt + 0.5f * a_nav_avg.x * dt * dt;
-    estimator->position_ned.y += estimator->velocity_mps.y * dt + 0.5f * a_nav_avg.y * dt * dt;
-    estimator->position_ned.z += estimator->velocity_mps.z * dt + 0.5f * a_nav_avg.z * dt * dt;
-
-    // Integrate accel to get velocity
-    estimator->velocity_mps.x += a_nav_avg.x * dt;
-    estimator->velocity_mps.y += a_nav_avg.y * dt;
-    estimator->velocity_mps.z += a_nav_avg.z * dt;
-
-    // Update previous NED acceleration
-    estimator->a_nav_prev = a_nav_curr;
-}
-
-// =============================================================================
-// HELPER FUNCTIONS FOR 3x3 BLOCK MATRIX OPERATIONS
-// =============================================================================
-
-static inline helius_mat3_t block_get(const helius_cov15_t* P, uint8_t row_idx, uint8_t col_idx) {
-    helius_mat3_t block;
-    uint8_t r_off = row_idx * 3;
-    uint8_t c_off = col_idx * 3;
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            block.m[i][j] = P->p[r_off + i][c_off + j];
+    float H[3][6] = {0};
+    float H_theta[3][3] = {0};
+    mat3_skew_from_vec3(pred_body_hat, H_theta);
+    for (int i = 0; i < 3; i++)
+    {
+        for (int j = 0; j < 3; j++)
+        {
+            H[i][j] = H_theta[i][j];
         }
     }
-    return block;
-}
 
-static inline void block_set(helius_cov15_t* P, uint8_t row_idx, uint8_t col_idx, const helius_mat3_t* block) {
-    uint8_t r_off = row_idx * 3;
-    uint8_t c_off = col_idx * 3;
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            P->p[r_off + i][c_off + j] = block->m[i][j];
+    float Ht[6][3] = {0};
+    for (int i = 0; i < 3; i++)
+    {
+        for (int j = 0; j < 6; j++)
+        {
+            Ht[j][i] = H[i][j];
         }
     }
-}
 
-static inline helius_mat3_t mat3_add(helius_mat3_t a, helius_mat3_t b) {
-    helius_mat3_t res;
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            res.m[i][j] = a.m[i][j] + b.m[i][j];
-        }
-    }
-    return res;
-}
-
-static inline helius_mat3_t mat3_scale(helius_mat3_t a, float scalar) {
-    helius_mat3_t res;
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            res.m[i][j] = a.m[i][j] * scalar;
-        }
-    }
-    return res;
-}
-
-// =============================================================================
-// ERROR-STATE COVARIANCE PROPAGATION (15x15 via 3x3 Blocks)
-// =============================================================================
-
-static void predict_covariance(
-    helius_estimator_t* estimator, 
-    helius_vec3_t w_corr, 
-    helius_vec3_t a_corr, 
-    float dt) 
-{
-    // 1. Compute rotation matrix
-    helius_mat3_t R_body_to_nav = helius_mat3_from_quat(estimator->attitude_rad);
-
-    // 2. Build non-zero 3x3 sub-blocks of state transition matrix Phi
-    helius_mat3_t I3 = helius_mat3_identity();
-    helius_mat3_t w_skew = helius_mat3_skew(w_corr);
-    helius_mat3_t Phi_00 = mat3_add(I3, mat3_scale(w_skew, -dt));
-    helius_mat3_t Phi_03 = mat3_scale(I3, -dt);
-    helius_mat3_t Phi_12 = mat3_scale(I3, dt);
-
-    helius_mat3_t a_skew = helius_mat3_skew(a_corr);
-    helius_mat3_t R_a_skew = helius_mat3_mult(R_body_to_nav, a_skew);
-    helius_mat3_t Phi_20 = mat3_scale(R_a_skew, -dt);
-    helius_mat3_t Phi_24 = mat3_scale(R_body_to_nav, -dt);
-
-    helius_mat3_t Phi_00_T = helius_mat3_transpose(Phi_00);
-    helius_mat3_t Phi_03_T = helius_mat3_transpose(Phi_03);
-    helius_mat3_t Phi_12_T = helius_mat3_transpose(Phi_12);
-    helius_mat3_t Phi_20_T = helius_mat3_transpose(Phi_20);
-    helius_mat3_t Phi_24_T = helius_mat3_transpose(Phi_24);
-
-    // Buffer temporário leve apenas para uma linha (180 bytes na pilha)
-    helius_mat3_t M_row[HELIUS_BLOCK_COUNT];
-
-    for (int i = 0; i < HELIUS_BLOCK_COUNT; i++) {
-        // Step A: Calculate Row i of M = Phi * P_active
-        for (int j = 0; j < HELIUS_BLOCK_COUNT; j++) {
-            helius_mat3_t P_0j = block_get(estimator->P, HELIUS_BLOCK_ATT, j);
-            helius_mat3_t P_1j = block_get(estimator->P, HELIUS_BLOCK_POS, j);
-            helius_mat3_t P_2j = block_get(estimator->P, HELIUS_BLOCK_VEL, j);
-            helius_mat3_t P_3j = block_get(estimator->P, HELIUS_BLOCK_BG,  j);
-            helius_mat3_t P_4j = block_get(estimator->P, HELIUS_BLOCK_BA,  j);
-
-            switch (i) {
-                case HELIUS_BLOCK_ATT:
-                    M_row[j] = mat3_add(helius_mat3_mult(Phi_00, P_0j), helius_mat3_mult(Phi_03, P_3j));
-                    break;
-                case HELIUS_BLOCK_POS:
-                    M_row[j] = mat3_add(P_1j, helius_mat3_mult(Phi_12, P_2j));
-                    break;
-                case HELIUS_BLOCK_VEL:
-                    M_row[j] = mat3_add(helius_mat3_mult(Phi_20, P_0j), mat3_add(P_2j, helius_mat3_mult(Phi_24, P_4j)));
-                    break;
-                case HELIUS_BLOCK_BG:
-                    M_row[j] = P_3j;
-                    break;
-                case HELIUS_BLOCK_BA:
-                    M_row[j] = P_4j;
-                    break;
+    float PHt[6][3] = {0};
+    for (int i = 0; i < 6; i++)
+    {
+        for (int j = 0; j < 3; j++)
+        {
+            float sum = 0.0f;
+            for (int k = 0; k < 6; k++)
+            {
+                sum += e->P[i][k] * Ht[k][j];
             }
-        }
-
-        // Step B: Calculate Row i of P_pred = M_row * Phi^T
-        for (int j = i; j < HELIUS_BLOCK_COUNT; j++) {
-            helius_mat3_t block_ij;
-
-            switch (j) {
-                case HELIUS_BLOCK_ATT:
-                    block_ij = mat3_add(
-                        helius_mat3_mult(M_row[HELIUS_BLOCK_ATT], Phi_00_T), 
-                        helius_mat3_mult(M_row[HELIUS_BLOCK_BG],  Phi_03_T)
-                    );
-                    break;
-                case HELIUS_BLOCK_POS:
-                    block_ij = mat3_add(
-                        M_row[HELIUS_BLOCK_POS], 
-                        helius_mat3_mult(M_row[HELIUS_BLOCK_VEL], Phi_12_T)
-                    );
-                    break;
-                case HELIUS_BLOCK_VEL:
-                    block_ij = mat3_add(
-                        helius_mat3_mult(M_row[HELIUS_BLOCK_ATT], Phi_20_T),
-                        mat3_add(M_row[HELIUS_BLOCK_VEL], helius_mat3_mult(M_row[HELIUS_BLOCK_BA], Phi_24_T))
-                    );
-                    break;
-                case HELIUS_BLOCK_BG:
-                    block_ij = M_row[HELIUS_BLOCK_BG];
-                    break;
-                case HELIUS_BLOCK_BA:
-                    block_ij = M_row[HELIUS_BLOCK_BA];
-                    break;
-            }
-
-            // Write to predicted buffer
-            block_set(estimator->P_pred, i, j, &block_ij);
-
-            if (i != j) {
-                helius_mat3_t block_ji = helius_mat3_transpose(block_ij);
-                block_set(estimator->P_pred, j, i, &block_ji);
-            }
+            PHt[i][j] = sum;
         }
     }
 
-    // 4. Add Process Noise (Qd) directly to P_pred diagonal
-    float gyro_var_dt   = estimator->noise.gyro_noise_std  * estimator->noise.gyro_noise_std  * dt;
-    float accel_var_dt  = estimator->noise.accel_noise_std * estimator->noise.accel_noise_std * dt;
-    float g_bias_var_dt = estimator->noise.gyro_bias_std   * estimator->noise.gyro_bias_std   * dt;
-    float a_bias_var_dt = estimator->noise.accel_bias_std  * estimator->noise.accel_bias_std  * dt;
-
-    for (int k = 0; k < 3; k++) {
-        estimator->P_pred->p[0 + k][0 + k]   += gyro_var_dt;
-        estimator->P_pred->p[6 + k][6 + k]   += accel_var_dt;
-        estimator->P_pred->p[9 + k][9 + k]   += g_bias_var_dt;
-        estimator->P_pred->p[12 + k][12 + k] += a_bias_var_dt;
+    float S[3][3] = {0};
+    for (int i = 0; i < 3; i++)
+    {
+        for (int j = 0; j < 3; j++)
+        {
+            float sum = 0.0f;
+            for (int k = 0; k < 6; k++)
+            {
+                sum += H[i][k] * PHt[k][j];
+            }
+            S[i][j] = sum;
+        }
     }
 
-    // 5. Swap pointers in O(1) time without moving 900 bytes in memory
-    helius_cov15_t* temp = estimator->P;
-    estimator->P = estimator->P_pred;
-    estimator->P_pred = temp;
+    float sigma = fmaxf(meas_dir_sigma, e->min_meas_sigma);
+    float R[3][3] = {
+        {sigma * sigma, 0.0f, 0.0f},
+        {0.0f, sigma * sigma, 0.0f},
+        {0.0f, 0.0f, sigma * sigma},
+    };
+    for (int i = 0; i < 3; i++)
+    {
+        S[i][i] += R[i][i];
+    }
+
+    float S_inv[3][3] = {0};
+    if (!mat3_inverse(S, S_inv))
+    {
+        return false;
+    }
+
+    if (nis_gate > 0.0f)
+    {
+        float Sr[3] = {0};
+        float r[3] = {residual.x, residual.y, residual.z};
+        for (int i = 0; i < 3; i++)
+        {
+            float sum = 0.0f;
+            for (int j = 0; j < 3; j++)
+            {
+                sum += S_inv[i][j] * r[j];
+            }
+            Sr[i] = sum;
+        }
+
+        float nis = 0.0f;
+        for (int i = 0; i < 3; i++)
+        {
+            nis += r[i] * Sr[i];
+        }
+
+        if (!isfinite(nis) || nis > nis_gate)
+        {
+            return false;
+        }
+    }
+
+    float K[6][3] = {0};
+    for (int i = 0; i < 6; i++)
+    {
+        for (int j = 0; j < 3; j++)
+        {
+            float sum = 0.0f;
+            for (int k = 0; k < 3; k++)
+            {
+                sum += PHt[i][k] * S_inv[k][j];
+            }
+            K[i][j] = sum;
+        }
+    }
+
+    float dx[6] = {0};
+    float residual_vec[3] = {residual.x, residual.y, residual.z};
+    for (int i = 0; i < 6; i++)
+    {
+        float sum = 0.0f;
+        for (int j = 0; j < 3; j++)
+        {
+            sum += K[i][j] * residual_vec[j];
+        }
+        dx[i] = sum;
+    }
+
+    vec3_t dtheta = {
+        .x = dx[0],
+        .y = dx[1],
+        .z = dx[2],
+    };
+    quat_t dq = {
+        .w = 1.0f,
+        .x = 0.5f * dtheta.x,
+        .y = 0.5f * dtheta.y,
+        .z = 0.5f * dtheta.z,
+    };
+    dq = quat_normalize(dq);
+    e->attitude = quat_mult(e->attitude, dq);
+    e->attitude = quat_normalize(e->attitude);
+
+    e->gyro_bias_rps.x = clampf(e->gyro_bias_rps.x + dx[3], -e->bias_limit_rps, e->bias_limit_rps);
+    e->gyro_bias_rps.y = clampf(e->gyro_bias_rps.y + dx[4], -e->bias_limit_rps, e->bias_limit_rps);
+    e->gyro_bias_rps.z = clampf(e->gyro_bias_rps.z + dx[5], -e->bias_limit_rps, e->bias_limit_rps);
+
+    float KH[6][6] = {0};
+    for (int i = 0; i < 6; i++)
+    {
+        for (int j = 0; j < 6; j++)
+        {
+            float sum = 0.0f;
+            for (int k = 0; k < 3; k++)
+            {
+                sum += K[i][k] * H[k][j];
+            }
+            KH[i][j] = sum;
+        }
+    }
+
+    float I_KH[6][6] = {0};
+    for (int i = 0; i < 6; i++)
+    {
+        I_KH[i][i] = 1.0f;
+        for (int j = 0; j < 6; j++)
+        {
+            I_KH[i][j] -= KH[i][j];
+        }
+    }
+
+    float temp[6][6] = {0};
+    float I_KH_t[6][6] = {0};
+    float joseph_left[6][6] = {0};
+    mat6_mul(I_KH, e->P, temp);
+    mat6_transpose(I_KH, I_KH_t);
+    mat6_mul(temp, I_KH_t, joseph_left);
+
+    float KR[6][3] = {0};
+    for (int i = 0; i < 6; i++)
+    {
+        for (int j = 0; j < 3; j++)
+        {
+            KR[i][j] = K[i][j] * R[j][j];
+        }
+    }
+
+    float KRKt[6][6] = {0};
+    for (int i = 0; i < 6; i++)
+    {
+        for (int j = 0; j < 6; j++)
+        {
+            float sum = 0.0f;
+            for (int k = 0; k < 3; k++)
+            {
+                sum += KR[i][k] * K[j][k];
+            }
+            KRKt[i][j] = sum;
+        }
+    }
+
+    mat6_add(joseph_left, KRKt, e->P);
+    for (int i = 0; i < 6; i++)
+    {
+        e->P[i][i] = fmaxf(e->P[i][i], e->min_cov_diag);
+    }
+    mat6_symmetrize(e->P);
+    return true;
 }
 
-void helius_estimator_predict(helius_estimator_t *estimator, const helius_imu_t *imu_measurement, float dt)
+static bool project_onto_plane(vec3_t v, vec3_t plane_normal_hat, vec3_t* v_proj_hat)
 {
-    // Correct sensor with respective bias
-    helius_vec3_t w_corr = {
-        imu_measurement->gyro_x_rps - estimator->gyro_bias_rps.x,
-        imu_measurement->gyro_y_rps - estimator->gyro_bias_rps.y,
-        imu_measurement->gyro_z_rps - estimator->gyro_bias_rps.z};
+    vec3_t v_proj = vec3_sub(v, vec3_scale(plane_normal_hat, vec3_dot(v, plane_normal_hat)));
+    float v_proj_norm = vec3_norm(v_proj);
+    if (v_proj_norm <= 1e-6f)
+    {
+        return false;
+    }
 
-    helius_vec3_t a_corr = {
-        imu_measurement->accel_x_mps2 - estimator->accel_bias_mps2.x,
-        imu_measurement->accel_y_mps2 - estimator->accel_bias_mps2.y,
-        imu_measurement->accel_z_mps2 - estimator->accel_bias_mps2.z};
+    *v_proj_hat = vec3_scale(v_proj, 1.0f / v_proj_norm);
+    return true;
+}
 
-    predict_nominal_state(estimator, w_corr, a_corr, dt);
-    predict_covariance(estimator, w_corr, a_corr, dt);
+void estimator_init(estimator_t *e, float gyro_noise, float gyro_bias_noise)
+{
+    // That state vector initialization needs a better approach.
+    // Maybe do some calibration first using accel/mag/gnss to get a good initial attitude.
+    e->attitude = quat_identity();
+
+    e->gyro_bias_rps.x = 0.0f;
+    e->gyro_bias_rps.y = 0.0f;
+    e->gyro_bias_rps.z = 0.0f;
+
+    e->gyro_noise = gyro_noise;
+    e->gyro_bias_noise = gyro_bias_noise;
+    e->accel_noise = 0.20f;
+    e->mag_noise = 0.1f;
+
+    // Defaults are runtime-tunable via estimator_t fields by application code.
+    e->accel_nis_gate = 9.21f;      // chi-square gate for 3 DoF at ~99%
+    e->min_meas_sigma = 1e-4f;
+    e->mag_jacobian_eps = 1e-4f;
+    e->min_innovation_det = 1e-12f;
+    e->min_cov_diag = 1e-6f;
+    e->bias_limit_rps = 0.2f;
+
+    e->mag_nav_ref = vec3_zero();
+    e->mag_ref_valid = false;
+
+    for (int i = 0; i < 6; i++)
+    {
+        for (int j = 0; j < 6; j++)
+        {
+            e->P[i][j] = 0.0f;
+        }
+    }
+
+    e->P[0][0] = 0.1f * 0.1f;
+    e->P[1][1] = 0.1f * 0.1f;
+    e->P[2][2] = 0.1f * 0.1f;
+    e->P[3][3] = 0.01f * 0.01f;
+    e->P[4][4] = 0.01f * 0.01f;
+    e->P[5][5] = 0.01f * 0.01f;
+}
+
+void estimator_predict(estimator_t *e, const vec3_t* gyro_meas_rps, float dt)
+{
+    vec3_t gyro_corr = {
+        .x = gyro_meas_rps->x - e->gyro_bias_rps.x,
+        .y = gyro_meas_rps->y - e->gyro_bias_rps.y,
+        .z = gyro_meas_rps->z - e->gyro_bias_rps.z,
+    };
+
+    quat_t dq = {
+        .w = 1.0f,
+        .x = 0.5f * gyro_corr.x * dt,
+        .y = 0.5f * gyro_corr.y * dt,
+        .z = 0.5f * gyro_corr.z * dt,
+    };
+    dq = quat_normalize(dq);
+
+    // Integrate using Body -> Navigation
+    e->attitude = quat_mult(dq, e->attitude);
+    e->attitude = quat_normalize(e->attitude);
+
+    // Jacobian calculation
+    float F[6][6] = {0};
+    for(int i = 0; i < 6; i++)
+        F[i][i] = 1.0f;
+
+    // Attitude relation
+    F[0][1] = gyro_corr.z * dt;
+    F[0][2] = -gyro_corr.y * dt;
+    F[1][0] = -gyro_corr.z * dt;
+    F[1][2] = gyro_corr.x * dt;
+    F[2][0] = gyro_corr.y * dt;
+    F[2][1] = -gyro_corr.x * dt;
+
+    // Gyro bias relation
+    F[0][3] = -dt;
+    F[1][4] = -dt;
+    F[2][5] = -dt;
+
+    // Q matrix calculation
+    float Q[6][6] = {0};
+    
+    float gyro_noise_sqr = e->gyro_noise * e->gyro_noise;
+    float gyro_bias_noise_sqr = e->gyro_bias_noise * e->gyro_bias_noise;
+
+    Q[0][0] = gyro_noise_sqr * dt;
+    Q[1][1] = gyro_noise_sqr * dt;
+    Q[2][2] = gyro_noise_sqr * dt;
+    Q[3][3] = gyro_bias_noise_sqr * dt;
+    Q[4][4] = gyro_bias_noise_sqr * dt;
+    Q[5][5] = gyro_bias_noise_sqr * dt;
+
+    float FP[6][6] = {0};
+    float Ft[6][6] = {0};
+    float FPFt[6][6] = {0};
+
+    mat6_mul(F, e->P, FP);
+    mat6_transpose(F, Ft);
+    mat6_mul(FP, Ft, FPFt);
+    mat6_add(FPFt, Q, e->P);
+    mat6_symmetrize(e->P);
+}
+
+void estimator_update_accel(estimator_t* e, const vec3_t* accel_meas_mps2)
+{
+    if (!vec3_is_finite(*accel_meas_mps2))
+    {
+        return;
+    }
+
+    float accel_norm = vec3_norm(*accel_meas_mps2);
+    if (accel_norm <= ACCEL_MIN_NORM_MPS2)
+    {
+        return;
+    }
+
+    vec3_t a_hat = vec3_scale(*accel_meas_mps2, 1.0f / accel_norm);
+
+    vec3_t g_nav = {
+        .x = 0.0f,
+        .y = 0.0f,
+        .z = -1.0f,
+    };
+
+    float accel_dir_sigma = fmaxf(e->accel_noise / accel_norm, e->min_meas_sigma);
+    (void)apply_vector_measurement_update(e, a_hat, g_nav, accel_dir_sigma, e->accel_nis_gate);
+}
+
+void estimator_set_mag_reference(estimator_t* e, const vec3_t* mag_nav_ref)
+{
+    if (!vec3_is_finite(*mag_nav_ref))
+    {
+        e->mag_ref_valid = false;
+        e->mag_nav_ref = vec3_zero();
+        return;
+    }
+
+    float mag_ref_norm = vec3_norm(*mag_nav_ref);
+    if (mag_ref_norm <= MAG_MIN_NORM_UT)
+    {
+        e->mag_ref_valid = false;
+        e->mag_nav_ref = vec3_zero();
+        return;
+    }
+
+    e->mag_nav_ref = vec3_scale(*mag_nav_ref, 1.0f / mag_ref_norm);
+    e->mag_ref_valid = true;
+}
+
+void estimator_update_mag(estimator_t* e, const vec3_t* mag_meas)
+{
+    if (!e->mag_ref_valid || !vec3_is_finite(*mag_meas))
+    {
+        return;
+    }
+
+    float mag_norm = vec3_norm(*mag_meas);
+    if (mag_norm <= MAG_MIN_NORM_UT)
+    {
+        return;
+    }
+
+    vec3_t mag_hat = vec3_scale(*mag_meas, 1.0f / mag_norm);
+    vec3_t g_nav = {
+        .x = 0.0f,
+        .y = 0.0f,
+        .z = -1.0f,
+    };
+    quat_t q_nb = quat_conjugate(e->attitude);
+    vec3_t g_body_hat = quat_rotate_vec3(q_nb, g_nav);
+    if (!vec3_is_finite(g_body_hat))
+    {
+        return;
+    }
+
+    vec3_t mag_body_horizontal_hat = vec3_zero();
+    if (!project_onto_plane(mag_hat, g_body_hat, &mag_body_horizontal_hat))
+    {
+        return;
+    }
+
+    vec3_t mag_pred_body_hat = quat_rotate_vec3(q_nb, e->mag_nav_ref);
+    if (!vec3_is_finite(mag_pred_body_hat))
+    {
+        return;
+    }
+
+    vec3_t mag_pred_horizontal_hat = vec3_zero();
+    if (!project_onto_plane(mag_pred_body_hat, g_body_hat, &mag_pred_horizontal_hat))
+    {
+        return;
+    }
+
+    float meas2[2] = {
+        mag_body_horizontal_hat.x,
+        mag_body_horizontal_hat.y,
+    };
+    float pred2[2] = {
+        mag_pred_horizontal_hat.x,
+        mag_pred_horizontal_hat.y,
+    };
+    float residual2[2] = {
+        meas2[0] - pred2[0],
+        meas2[1] - pred2[1],
+    };
+
+    float H[2][6] = {0};
+    const float eps = fmaxf(e->mag_jacobian_eps, 1e-8f);
+    for (int j = 0; j < 3; j++)
+    {
+        vec3_t dtheta_eps = {
+            .x = (j == 0) ? eps : 0.0f,
+            .y = (j == 1) ? eps : 0.0f,
+            .z = (j == 2) ? eps : 0.0f,
+        };
+        quat_t dq_eps = {
+            .w = 1.0f,
+            .x = 0.5f * dtheta_eps.x,
+            .y = 0.5f * dtheta_eps.y,
+            .z = 0.5f * dtheta_eps.z,
+        };
+        dq_eps = quat_normalize(dq_eps);
+
+        quat_t q_pert = quat_mult(e->attitude, dq_eps);
+        q_pert = quat_normalize(q_pert);
+        quat_t q_pert_nb = quat_conjugate(q_pert);
+
+        vec3_t g_body_hat_pert = quat_rotate_vec3(q_pert_nb, g_nav);
+        if (!vec3_is_finite(g_body_hat_pert))
+        {
+            return;
+        }
+
+        vec3_t mag_pred_body_hat_pert = quat_rotate_vec3(q_pert_nb, e->mag_nav_ref);
+        if (!vec3_is_finite(mag_pred_body_hat_pert))
+        {
+            return;
+        }
+
+        vec3_t mag_pred_horizontal_hat_pert = vec3_zero();
+        if (!project_onto_plane(mag_pred_body_hat_pert, g_body_hat_pert, &mag_pred_horizontal_hat_pert))
+        {
+            return;
+        }
+
+        H[0][j] = (mag_pred_horizontal_hat_pert.x - pred2[0]) / eps;
+        H[1][j] = (mag_pred_horizontal_hat_pert.y - pred2[1]) / eps;
+    }
+
+    float mag_dir_sigma = fmaxf(e->mag_noise / mag_norm, e->min_meas_sigma);
+    float R2[2][2] = {
+        {mag_dir_sigma * mag_dir_sigma, 0.0f},
+        {0.0f, mag_dir_sigma * mag_dir_sigma},
+    };
+
+    float Ht[6][2] = {0};
+    for (int i = 0; i < 2; i++)
+    {
+        for (int j = 0; j < 6; j++)
+        {
+            Ht[j][i] = H[i][j];
+        }
+    }
+
+    float PHt[6][2] = {0};
+    for (int i = 0; i < 6; i++)
+    {
+        for (int j = 0; j < 2; j++)
+        {
+            float sum = 0.0f;
+            for (int k = 0; k < 6; k++)
+            {
+                sum += e->P[i][k] * Ht[k][j];
+            }
+            PHt[i][j] = sum;
+        }
+    }
+
+    float S[2][2] = {0};
+    for (int i = 0; i < 2; i++)
+    {
+        for (int j = 0; j < 2; j++)
+        {
+            float sum = 0.0f;
+            for (int k = 0; k < 6; k++)
+            {
+                sum += H[i][k] * PHt[k][j];
+            }
+            S[i][j] = sum + R2[i][j];
+        }
+    }
+
+    float det = S[0][0] * S[1][1] - S[0][1] * S[1][0];
+    if (!(fabsf(det) > e->min_innovation_det) || !isfinite(det))
+    {
+        return;
+    }
+
+    float inv_det = 1.0f / det;
+    float S_inv[2][2] = {
+        { S[1][1] * inv_det, -S[0][1] * inv_det },
+        { -S[1][0] * inv_det, S[0][0] * inv_det },
+    };
+
+    float K[6][2] = {0};
+    for (int i = 0; i < 6; i++)
+    {
+        for (int j = 0; j < 2; j++)
+        {
+            float sum = 0.0f;
+            for (int k = 0; k < 2; k++)
+            {
+                sum += PHt[i][k] * S_inv[k][j];
+            }
+            K[i][j] = sum;
+        }
+    }
+
+    float dx[6] = {0};
+    for (int i = 0; i < 6; i++)
+    {
+        dx[i] = K[i][0] * residual2[0] + K[i][1] * residual2[1];
+    }
+
+    vec3_t dtheta = {
+        .x = dx[0],
+        .y = dx[1],
+        .z = dx[2],
+    };
+    quat_t dq = {
+        .w = 1.0f,
+        .x = 0.5f * dtheta.x,
+        .y = 0.5f * dtheta.y,
+        .z = 0.5f * dtheta.z,
+    };
+    dq = quat_normalize(dq);
+    e->attitude = quat_mult(e->attitude, dq);
+    e->attitude = quat_normalize(e->attitude);
+
+    e->gyro_bias_rps.x = clampf(e->gyro_bias_rps.x + dx[3], -e->bias_limit_rps, e->bias_limit_rps);
+    e->gyro_bias_rps.y = clampf(e->gyro_bias_rps.y + dx[4], -e->bias_limit_rps, e->bias_limit_rps);
+    e->gyro_bias_rps.z = clampf(e->gyro_bias_rps.z + dx[5], -e->bias_limit_rps, e->bias_limit_rps);
+
+    float I_KH[6][6] = {0};
+    for (int i = 0; i < 6; i++)
+    {
+        I_KH[i][i] = 1.0f;
+        for (int j = 0; j < 6; j++)
+        {
+            I_KH[i][j] -= K[i][0] * H[0][j] + K[i][1] * H[1][j];
+        }
+    }
+
+    float temp[6][6] = {0};
+    float I_KH_t[6][6] = {0};
+    float joseph_left[6][6] = {0};
+    mat6_mul(I_KH, e->P, temp);
+    mat6_transpose(I_KH, I_KH_t);
+    mat6_mul(temp, I_KH_t, joseph_left);
+
+    float KR[6][2] = {0};
+    for (int i = 0; i < 6; i++)
+    {
+        for (int j = 0; j < 2; j++)
+        {
+            KR[i][j] = K[i][0] * R2[0][j] + K[i][1] * R2[1][j];
+        }
+    }
+
+    float KRKt[6][6] = {0};
+    for (int i = 0; i < 6; i++)
+    {
+        for (int j = 0; j < 6; j++)
+        {
+            KRKt[i][j] = KR[i][0] * K[j][0] + KR[i][1] * K[j][1];
+        }
+    }
+
+    mat6_add(joseph_left, KRKt, e->P);
+    for (int i = 0; i < 6; i++)
+    {
+        e->P[i][i] = fmaxf(e->P[i][i], e->min_cov_diag);
+    }
+    mat6_symmetrize(e->P);
 }
