@@ -2,49 +2,38 @@
     "version": 3,
     "configurePresets": [
         {
-            "name": "jsbsim",
-            "binaryDir": "${sourceDir}/build/jsbsim",
+            "name": "default",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {
-                "BUILD_TARGET": "JSBSIM",
-                "HELIUS_MATH_BACKEND": "SCALAR"
+                "HELIUS_TARGET": "STM32",
+                "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/Firmware/cmake/gcc-arm-none-eabi.cmake"
             }
         },
         {
-            "name": "stm32",
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build/stm32",
-		    "toolchainFile": "${sourceDir}/firmware/cmake/gcc-arm-none-eabi.cmake",
+            "name": "Debug",
+            "inherits": "default",
             "cacheVariables": {
-                "BUILD_TARGET": "STM32",
-                "HELIUS_MATH_BACKEND": "SCALAR"
+                "CMAKE_BUILD_TYPE": "Debug"
             }
         },
         {
-            "name": "stm32-cmsis",
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build/stm32-cmsis",
-		    "toolchainFile": "${sourceDir}/firmware/cmake/gcc-arm-none-eabi.cmake",
+            "name": "Release",
+            "inherits": "default",
             "cacheVariables": {
-                "BUILD_TARGET": "STM32",
-                "HELIUS_MATH_BACKEND": "CMSIS"
+                "CMAKE_BUILD_TYPE": "Release"
             }
         }
     ],
     "buildPresets": [
         {
-            "name": "jsbsim",
-            "configurePreset": "jsbsim",
-            "jobs": 8
+            "name": "Debug",
+            "configurePreset": "Debug"
         },
         {
-            "name": "stm32",
-            "configurePreset": "stm32",
-            "jobs": 8
-        },
-        {
-            "name": "stm32-cmsis",
-            "configurePreset": "stm32-cmsis",
-            "jobs": 8
+            "name": "Release",
+            "configurePreset": "Release"
         }
     ]
 }

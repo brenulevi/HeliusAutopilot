@@ -1,0 +1,2 @@
+/home/breno/dev/HeliusAutopilot/Core/src/ahrs.c:5:15:ahrs_init	32	static
+/home/breno/dev/HeliusAutopilot/Core/src/ahrs.c:37:15:ahrs_predict	952	static

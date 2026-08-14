@@ -1,0 +1,8 @@
+/home/breno/dev/HeliusAutopilot/Core/src/math/mat3.c:6:6:mat3_zero	24	static
+/home/breno/dev/HeliusAutopilot/Core/src/math/mat3.c:15:6:mat3_identity	16	static
+/home/breno/dev/HeliusAutopilot/Core/src/math/mat3.c:23:6:mat3_add	32	static
+/home/breno/dev/HeliusAutopilot/Core/src/math/mat3.c:32:6:mat3_sub	32	static
+/home/breno/dev/HeliusAutopilot/Core/src/math/mat3.c:41:6:mat3_scale	32	static
+/home/breno/dev/HeliusAutopilot/Core/src/math/mat3.c:50:6:mat3_multiply	80	static
+/home/breno/dev/HeliusAutopilot/Core/src/math/mat3.c:67:6:mat3_transpose	72	static
+/home/breno/dev/HeliusAutopilot/Core/src/math/mat3.c:78:6:mat3_inverse	72	static

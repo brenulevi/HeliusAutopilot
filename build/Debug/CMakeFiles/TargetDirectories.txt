@@ -1,0 +1,13 @@
+/home/breno/dev/HeliusAutopilot/build/Debug/CMakeFiles/flash.dir
+/home/breno/dev/HeliusAutopilot/build/Debug/CMakeFiles/edit_cache.dir
+/home/breno/dev/HeliusAutopilot/build/Debug/CMakeFiles/rebuild_cache.dir
+/home/breno/dev/HeliusAutopilot/build/Debug/Core/CMakeFiles/helius_core.dir
+/home/breno/dev/HeliusAutopilot/build/Debug/Core/CMakeFiles/edit_cache.dir
+/home/breno/dev/HeliusAutopilot/build/Debug/Core/CMakeFiles/rebuild_cache.dir
+/home/breno/dev/HeliusAutopilot/build/Debug/Firmware/CMakeFiles/Firmware.dir
+/home/breno/dev/HeliusAutopilot/build/Debug/Firmware/CMakeFiles/edit_cache.dir
+/home/breno/dev/HeliusAutopilot/build/Debug/Firmware/CMakeFiles/rebuild_cache.dir
+/home/breno/dev/HeliusAutopilot/build/Debug/Firmware/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir
+/home/breno/dev/HeliusAutopilot/build/Debug/Firmware/cmake/stm32cubemx/CMakeFiles/USB_Device_Library.dir
+/home/breno/dev/HeliusAutopilot/build/Debug/Firmware/cmake/stm32cubemx/CMakeFiles/edit_cache.dir
+/home/breno/dev/HeliusAutopilot/build/Debug/Firmware/cmake/stm32cubemx/CMakeFiles/rebuild_cache.dir

@@ -1,0 +1,9 @@
+/home/breno/dev/HeliusAutopilot/Core/src/math/mat_ret.c:3:6:mat3x6_zero	24	static
+/home/breno/dev/HeliusAutopilot/Core/src/math/mat_ret.c:14:6:mat3x6_transpose	24	static
+/home/breno/dev/HeliusAutopilot/Core/src/math/mat_ret.c:25:6:mat3x6_multiply_mat6	104	static
+/home/breno/dev/HeliusAutopilot/Core/src/math/mat_ret.c:45:6:mat3x6_multiply_mat6x3	32	static
+/home/breno/dev/HeliusAutopilot/Core/src/math/mat_ret.c:61:6:mat6x3_multiply_vector	24	static
+/home/breno/dev/HeliusAutopilot/Core/src/math/mat_ret.c:71:6:mat6x3_multiply_mat3	104	static
+/home/breno/dev/HeliusAutopilot/Core/src/math/mat_ret.c:88:6:mat6x3_multiply_mat3x6	32	static
+/home/breno/dev/HeliusAutopilot/Core/src/math/mat_ret.c:101:6:mat6x3_transpose	24	static
+/home/breno/dev/HeliusAutopilot/Core/src/math/mat_ret.c:112:6:mat6_multiply_mat6x3	104	static

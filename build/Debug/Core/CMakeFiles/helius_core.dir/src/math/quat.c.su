@@ -1,0 +1,4 @@
+/home/breno/dev/HeliusAutopilot/Core/src/math/quat.c:5:6:quat_multiply	24	static
+/home/breno/dev/HeliusAutopilot/Core/src/math/quat.c:13:6:quat_conjugate	16	static
+/home/breno/dev/HeliusAutopilot/Core/src/math/quat.c:21:6:quat_normalize	24	static
+/home/breno/dev/HeliusAutopilot/Core/src/math/quat.c:41:6:quat_identity	16	static

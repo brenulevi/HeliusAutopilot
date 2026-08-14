@@ -1,0 +1,19 @@
+{
+    "cmake.sourceDirectory": "${workspaceFolder}",
+    "cmake.configurePreset": "Debug",
+    "cmake.buildPreset": "Debug",
+    "cmake.debugConfig": {
+        "type": "cortex-debug",
+        "request": "launch",
+        "servertype": "stlink",
+        "cwd": "${workspaceFolder}",
+        "executable": "${command:cmake.launchTargetPath}",
+        "gdbPath": "${env:HOME}/.local/share/stm32cube/bundles/gnu-gdb-for-stm32/14.3.1+st.2/bin/arm-none-eabi-gdb",
+        "serverpath": "${env:HOME}/.local/share/stm32cube/bundles/stlink-gdbserver/7.14.0+st.2/bin/ST-LINK_gdbserver",
+        "stm32cubeprogrammer": "${env:HOME}/.local/share/stm32cube/bundles/programmer/2.23.0/bin",
+        "device": "STM32F411RE",
+        "interface": "swd",
+        "runToEntryPoint": "main",
+        "svdFile": "${env:HOME}/.local/share/stm32cube/packs/STMicroelectronics/stm32f4xx_dfp/1.2.0/SVD/STM32F411.svd"
+    }
+}

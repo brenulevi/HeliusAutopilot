@@ -1,0 +1,12 @@
+/home/breno/dev/HeliusAutopilot/Firmware/Drivers/MPU9250/mpu9250.c:13:23:mpu9250_get_accel_scale	16	static
+/home/breno/dev/HeliusAutopilot/Firmware/Drivers/MPU9250/mpu9250.c:46:23:mpu9250_get_gyro_scale	16	static
+/home/breno/dev/HeliusAutopilot/Firmware/Drivers/MPU9250/mpu9250.c:79:23:mpu9250_apply_accel_range	24	static
+/home/breno/dev/HeliusAutopilot/Firmware/Drivers/MPU9250/mpu9250.c:108:23:mpu9250_apply_gyro_range	24	static
+/home/breno/dev/HeliusAutopilot/Firmware/Drivers/MPU9250/mpu9250.c:137:23:mpu9250_set_clock	16	static
+/home/breno/dev/HeliusAutopilot/Firmware/Drivers/MPU9250/mpu9250.c:152:23:mpu9250_configure	24	static
+/home/breno/dev/HeliusAutopilot/Firmware/Drivers/MPU9250/mpu9250.c:245:16:mpu9250_init	32	static
+/home/breno/dev/HeliusAutopilot/Firmware/Drivers/MPU9250/mpu9250.c:334:16:mpu9250_set_accel_range	16	static
+/home/breno/dev/HeliusAutopilot/Firmware/Drivers/MPU9250/mpu9250.c:352:16:mpu9250_set_gyro_range	16	static
+/home/breno/dev/HeliusAutopilot/Firmware/Drivers/MPU9250/mpu9250.c:370:16:mpu9250_read_data	64	static
+/home/breno/dev/HeliusAutopilot/Firmware/Drivers/MPU9250/mpu9250.c:457:16:mpu9250_read_register	40	static
+/home/breno/dev/HeliusAutopilot/Firmware/Drivers/MPU9250/mpu9250.c:488:16:mpu9250_write_register	40	static

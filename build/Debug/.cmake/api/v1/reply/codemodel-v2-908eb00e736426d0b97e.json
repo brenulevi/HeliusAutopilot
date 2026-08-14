@@ -1,0 +1,164 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"childIndexes" : 
+					[
+						1,
+						2
+					],
+					"jsonFile" : "directory-.-Debug-f5ebdc15457944623624.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.22"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						3
+					]
+				},
+				{
+					"build" : "Core",
+					"jsonFile" : "directory-Core-Debug-611b2c2e495e6cca7ce5.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.22"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 0,
+					"source" : "Core",
+					"targetIndexes" : 
+					[
+						4
+					]
+				},
+				{
+					"build" : "Firmware",
+					"childIndexes" : 
+					[
+						3
+					],
+					"jsonFile" : "directory-Firmware-Debug-bc9091faacc7657c40fd.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.22"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 1,
+					"source" : "Firmware",
+					"targetIndexes" : 
+					[
+						0
+					]
+				},
+				{
+					"build" : "Firmware/cmake/stm32cubemx",
+					"jsonFile" : "directory-Firmware.cmake.stm32cubemx-Debug-63904bb2823e452b173b.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.22"
+					},
+					"parentIndex" : 2,
+					"projectIndex" : 1,
+					"source" : "Firmware/cmake/stm32cubemx",
+					"targetIndexes" : 
+					[
+						1,
+						2
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"childIndexes" : 
+					[
+						1
+					],
+					"directoryIndexes" : 
+					[
+						0,
+						1
+					],
+					"name" : "HeliusAutopilot",
+					"targetIndexes" : 
+					[
+						3,
+						4
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						2,
+						3
+					],
+					"name" : "Firmware",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 2,
+					"id" : "Firmware::@57ffc2184561ba14f3a7",
+					"jsonFile" : "target-Firmware-Debug-c8bb5ed9d6506d988f78.json",
+					"name" : "Firmware",
+					"projectIndex" : 1
+				},
+				{
+					"directoryIndex" : 3,
+					"id" : "STM32_Drivers::@fa5bd674ccd295096669",
+					"jsonFile" : "target-STM32_Drivers-Debug-d3eaca4d4a49e268852a.json",
+					"name" : "STM32_Drivers",
+					"projectIndex" : 1
+				},
+				{
+					"directoryIndex" : 3,
+					"id" : "USB_Device_Library::@fa5bd674ccd295096669",
+					"jsonFile" : "target-USB_Device_Library-Debug-160b1cf431d15ee4aeeb.json",
+					"name" : "USB_Device_Library",
+					"projectIndex" : 1
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "flash::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-flash-Debug-9404b14070a3b701926c.json",
+					"name" : "flash",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "helius_core::@94795ff35dabbbd3a8ca",
+					"jsonFile" : "target-helius_core-Debug-1744f5f3c3a85b1793bd.json",
+					"name" : "helius_core",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/home/breno/dev/HeliusAutopilot/build/Debug",
+		"source" : "/home/breno/dev/HeliusAutopilot"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 3
+	}
+}
