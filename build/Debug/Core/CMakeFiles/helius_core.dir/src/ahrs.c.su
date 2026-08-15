@@ -1,2 +1,5 @@
-/home/breno/dev/HeliusAutopilot/Core/src/ahrs.c:5:15:ahrs_init	32	static
-/home/breno/dev/HeliusAutopilot/Core/src/ahrs.c:37:15:ahrs_predict	952	static
+C:/Users/breno/Documents/HeliusAutopilot/Core/src/ahrs.c:7:13:extract_3x3_block_from_6x6	32	static
+C:/Users/breno/Documents/HeliusAutopilot/Core/src/ahrs.c:18:13:insert_3x3_block_into_6x6	32	static
+C:/Users/breno/Documents/HeliusAutopilot/Core/src/ahrs.c:29:15:ahrs_init	32	static
+C:/Users/breno/Documents/HeliusAutopilot/Core/src/ahrs.c:61:15:ahrs_predict	400	static
+C:/Users/breno/Documents/HeliusAutopilot/Core/src/ahrs.c:189:15:ahrs_update_accel	200	static

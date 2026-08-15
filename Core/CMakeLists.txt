@@ -2,6 +2,7 @@ add_library(helius_core STATIC
     src/math/vec3.c
     src/math/quat.c
     src/math/mat6.c
+    src/math/mat3.c
 
     src/ahrs.c
 )

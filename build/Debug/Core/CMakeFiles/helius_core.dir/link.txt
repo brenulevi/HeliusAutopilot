@@ -1,2 +1,0 @@
-/home/breno/.local/share/stm32cube/bundles/gnu-tools-for-stm32/14.3.1+st.2/bin/arm-none-eabi-ar qc libhelius_core.a CMakeFiles/helius_core.dir/src/math/vec3.c.obj CMakeFiles/helius_core.dir/src/math/quat.c.obj CMakeFiles/helius_core.dir/src/math/mat3.c.obj CMakeFiles/helius_core.dir/src/math/mat6.c.obj CMakeFiles/helius_core.dir/src/math/mat_ret.c.obj CMakeFiles/helius_core.dir/src/ahrs.c.obj
-/home/breno/.local/share/stm32cube/bundles/gnu-tools-for-stm32/14.3.1+st.2/bin/arm-none-eabi-ranlib libhelius_core.a

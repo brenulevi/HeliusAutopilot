@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug Firmware (ST-Link)",
+            "name": "Debug Firmware (ST-Link) - LINUX",
             "type": "cortex-debug",
             "request": "launch",
             "servertype": "stlink",
@@ -15,6 +15,30 @@
             "interface": "swd",
             "runToEntryPoint": "main",
             "svdFile": "${env:HOME}/.local/share/stm32cube/packs/STMicroelectronics/stm32f4xx_dfp/1.2.0/SVD/STM32F411.svd"
+        },
+        {
+            "name": "Debug Firmware (ST-Link) - WINDOWS",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "stlink",
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/build/Debug/Firmware/Firmware.elf",
+            
+            // 1. Caminho do GDB (com .exe no final)
+            "gdbPath": "C:/ST/STM32CubeCLT_1.22.0/GNU-tools-for-STM32/bin/arm-none-eabi-gdb.exe",
+            
+            // 2. Caminho do GDB Server do ST-Link (com .exe no final)
+            "serverpath": "C:/ST/STM32CubeCLT_1.22.0/STLink-gdb-server/bin/ST-LINK_gdbserver.exe",
+            
+            // 3. Caminho da pasta bin do CubeProgrammer
+            "stm32cubeprogrammer": "C:/ST/STM32CubeCLT_1.22.0/STM32CubeProgrammer/bin",
+            
+            "device": "STM32F411RE",
+            "interface": "swd",
+            "runToEntryPoint": "main",
+            
+            // 4. Arquivo SVD (Geralmente fica na pasta do usuário quando baixado pelo CubeMX)
+            "svdFile": "${env:USERPROFILE}/STM32Cube/Repository/Packs/STMicroelectronics/STM32F4xx_DFP/2.17.1/CMSIS/SVD/STM32F411xx.svd"
         }
     ]
 }
