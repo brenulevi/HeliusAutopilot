@@ -3,14 +3,14 @@
 
 #include <stdbool.h>
 
-#include "math/quat.h"
-#include "math/vec3.h"
-#include "math/mat6.h"
+#include "helius/math/quat.h"
+#include "helius/math/vec3.h"
+#include "helius/math/mat6.h"
 
 typedef enum
 {
-    AHRS_OK = 0,
-    AHRS_ERROR = 1,
+    AHRS_STATUS_OK = 0,
+    AHRS_STATUS_ERROR = 1,
 } ahrs_status_t;
 
 typedef struct
@@ -38,6 +38,7 @@ typedef struct
 
 ahrs_status_t ahrs_init(ahrs_t *ahrs, const ahrs_config_t *config);
 ahrs_status_t ahrs_predict(ahrs_t *ahrs, const vec3_t *gyro_rps, float dt);
-ahrs_status_t ahrs_update_accel(ahrs_t *ahrs, const vec3_t *accel_mps2, float dt);
+ahrs_status_t ahrs_update_accel(ahrs_t *ahrs, const vec3_t *accel_mps2);
+ahrs_status_t ahrs_update_mag(ahrs_t* ahrs, const vec3_t* mag_ut);
 
 #endif // HELIUS_AHRS_H_

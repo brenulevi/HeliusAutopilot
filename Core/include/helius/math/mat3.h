@@ -15,5 +15,6 @@ void mat3_multiply(const mat3_t* a, const mat3_t* b, mat3_t* result);
 void mat3_transpose(const mat3_t* m, mat3_t* result);
 void mat3_copy(const mat3_t* src, mat3_t* dest);
 bool mat3_inverse(const mat3_t* m, mat3_t* result);
+float mat3_det(const mat3_t* m);
 
 #endif // HELIUS_MATH_MAT3_H_

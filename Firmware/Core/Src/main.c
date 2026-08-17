@@ -22,11 +22,17 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdio.h>
+#include <string.h>
+
 #include "usbd_cdc.h"
 #include "usbd_cdc_if.h"
+
 #include "i2c_protocol.h"
 #include "gy91.h"
-#include "helius/ahrs.h"
+
+#include "helius/core.h"
+#include "helius/calibration.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -55,7 +61,9 @@
 I2C_HandleTypeDef hi2c1;
 
 /* USER CODE BEGIN PV */
-
+static I2C_Protocol i2c_protocol;
+static GY91_Driver gy91;
+static core_t helius;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -91,6 +99,54 @@ static uint32_t DWT_CyclesSince(uint32_t start)
 {
 	return DWT->CYCCNT - start;
 }
+
+static void ProcessCommands(
+	const char *command)
+{
+	core_status_t status;
+
+	if (strcmp(command, "CAL MAG START") == 0)
+	{
+		status = core_command(
+			&helius,
+			CORE_CMD_MAG_CAL_START);
+
+		if (status == CORE_STATUS_OK)
+		{
+			printf("OK,CAL MAG START\r\n");
+		}
+		else
+		{
+			printf(
+				"ERROR,CAL MAG START,%d\r\n",
+				(int)status);
+		}
+
+		return;
+	}
+
+	if (strcmp(command, "CAL MAG STOP") == 0)
+	{
+		status = core_command(
+			&helius,
+			CORE_CMD_MAG_CAL_STOP);
+
+		if (status == CORE_STATUS_OK)
+		{
+			printf("OK,CAL MAG STOP\r\n");
+		}
+		else
+		{
+			printf(
+				"ERROR,CAL MAG STOP,%d\r\n",
+				(int)status);
+		}
+
+		return;
+	}
+
+	printf("ERROR,UNKNOWN COMMAND\r\n");
+}
 /* USER CODE END 0 */
 
 /**
@@ -125,29 +181,14 @@ int main(void)
 	MX_I2C1_Init();
 	MX_USB_DEVICE_Init();
 	/* USER CODE BEGIN 2 */
-
-	HAL_Delay(1000); // Wait for USB enumeration to complete
-
-	printf(
-		"after init: state=%lu error=0x%08lX\r\n",
-		(uint32_t)HAL_I2C_GetState(&hi2c1),
-		HAL_I2C_GetError(&hi2c1));
-
-	I2C_Protocol i2c_protocol;
 	if (i2c_protocol_init(&i2c_protocol, &hi2c1, 1000) != I2C_PROTOCOL_OK)
 	{
 		printf("I2C protocol initialization failed!\n");
 		return -1;
 	}
 
-	printf(
-		"after init: state=%lu error=0x%08lX\r\n",
-		(uint32_t)HAL_I2C_GetState(&hi2c1),
-		HAL_I2C_GetError(&hi2c1));
-
 	printf("I2C protocol initialized successfully.\n");
 
-	GY91_Driver gy91;
 	if (gy91_init(&gy91, &i2c_protocol, MPU9250_ADDRESS, AK8963_ADDRESS) != GY91_STATUS_OK)
 	{
 		printf("GY91 initialization failed!\n");
@@ -156,19 +197,44 @@ int main(void)
 
 	printf("GY91 initialized successfully.\n");
 
-	ahrs_t ahrs;
-	ahrs_config_t ahrs_config = {
-		.initial_orientation_std = 0.2f,
-		.initial_gyro_bias_std = 0.1f,
-		.gyro_noise_density = 0.00017f,
-		.gyro_bias_random_walk = 2.0e-5f,
-		.accel_noise_density = 0.002942f};
+	/* ---------------------------------------------------------
+	 * Helius configuration
+	 * --------------------------------------------------------- */
 
-	if (ahrs_init(&ahrs, &ahrs_config) != AHRS_OK)
+	core_config_t core_config = {
+		.ahrs_config = {
+			.initial_orientation_std = 0.2f,
+			.initial_gyro_bias_std = 0.1f,
+			.gyro_noise_density = 0.00017f,
+			.gyro_bias_random_walk = 2.0e-5f,
+			.accel_noise_density = 0.002942f,
+		}};
+
+	/* ---------------------------------------------------------
+	 * Magnetometer calibration
+	 *
+	 * FUTURE:
+	 * storage_load_mag_calibration(&mag_calibration);
+	 * --------------------------------------------------------- */
+
+	mag_calibration_t mag_calibration;
+	if (calibration_mag_identity(&mag_calibration) != CALIBRATION_STATUS_OK)
 	{
-		printf("AHRS initialization failed!\n");
+		printf("Failed to initialize MAG calibration.\r\n");
 		return -1;
 	}
+
+	/* ---------------------------------------------------------
+	 * Core
+	 * --------------------------------------------------------- */
+
+	if (core_init(&helius, &core_config, &mag_calibration) != CORE_STATUS_OK)
+	{
+		printf("Helius core initialization failed!\r\n");
+		return -1;
+	}
+
+	printf("Helius core initialized successfully.\r\n");
 
 	DWT_CycleCounter_Init();
 	/* USER CODE END 2 */
@@ -185,6 +251,15 @@ int main(void)
 
 	while (1)
 	{
+		char command[64];
+
+		if (CDC_GetCommand(
+				command,
+				sizeof(command)))
+		{
+			ProcessCommands(command);
+		}
+
 		/* Signed subtraction keeps this comparison valid across CYCCNT wrap. */
 		if ((int32_t)(DWT->CYCCNT - next_gyro_cycle) < 0)
 		{
@@ -214,10 +289,15 @@ int main(void)
 		 * Gyroscope / prediction - 1000 Hz
 		 * ----------------------------------------------------- */
 
-		(void)ahrs_predict(
-			&ahrs,
-			&gy91.mpu9250.data.gyro_rps,
+		core_status_t core_status = core_update_gyro(
+			&helius,
+			&gy91.data.gyro_rps,
 			gyro_dt);
+
+		if (core_status != CORE_STATUS_OK)
+		{
+			/* error handling */
+		}
 
 		gyro_count++;
 
@@ -227,10 +307,17 @@ int main(void)
 
 		if ((gyro_count % accel_divider) == 0U)
 		{
-			(void)ahrs_update_accel(
-				&ahrs,
-				&gy91.mpu9250.data.accel_mps2,
-				1.0f / (float)ACCEL_RATE_HZ);
+			if ((gyro_count % accel_divider) == 0U)
+			{
+				core_status_t core_status = core_update_accel(
+					&helius,
+					&gy91.data.accel_mps2);
+
+				if (core_status != CORE_STATUS_OK)
+				{
+					/* error handling */
+				}
+			}
 		}
 
 		/* -----------------------------------------------------
@@ -241,8 +328,40 @@ int main(void)
 		{
 			if (gy91_read_ak8963_data(&gy91) == GY91_STATUS_OK)
 			{
-				// futuramente:
-				// (void)ahrs_update_mag(&ahrs, &mag_body);
+				core_status_t core_status = core_update_mag(
+					&helius,
+					&gy91.data.mag_ut);
+
+				if (core_status == CORE_STATUS_CALIBRATION_ACTIVE)
+				{
+					/*
+					 * Estamos coletando dados para hard/soft iron.
+					 * Envia MAG RAW para o Python.
+					 */
+
+					char msg[96];
+
+					int len = snprintf(
+						msg,
+						sizeof(msg),
+						"MAG,%.6f,%.6f,%.6f\r\n",
+						gy91.data.mag_ut.x,
+						gy91.data.mag_ut.y,
+						gy91.data.mag_ut.z);
+
+					if (len > 0)
+					{
+						(void)CDC_Transmit_FS(
+							(uint8_t *)msg,
+							(uint16_t)len);
+					}
+				}
+				else if (core_status != CORE_STATUS_OK)
+				{
+					/*
+					 * Erro real.
+					 */
+				}
 			}
 		}
 
@@ -250,15 +369,19 @@ int main(void)
 		 * Logging - 20 Hz
 		 * ----------------------------------------------------- */
 
-		if ((gyro_count % log_divider) == 0U)
+		if ((gyro_count % log_divider) == 0U && core_get_mode(&helius) == CORE_MODE_NORMAL)
 		{
 			char msg[128];
 
 			int len = snprintf(
 				msg,
 				sizeof(msg),
-				"%.4f\t%.4f\t%.4f\t"
-				"%.4f\t%.4f\t%.4f\r\n",
+				">accel_x:%.4f\n"
+				">accel_y:%.4f\n"
+				">accel_z:%.4f\n"
+				">mag_x:%.4f\n"
+				">mag_y:%.4f\n"
+				">mag_z:%.4f\n",
 
 				gy91.data.accel_mps2.x,
 				gy91.data.accel_mps2.y,
@@ -422,7 +545,7 @@ void assert_failed(uint8_t *file, uint32_t line)
 {
 	/* USER CODE BEGIN 6 */
 	/* User can add his own implementation to report the file name and line number,
-		 ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+	   ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
 	/* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */

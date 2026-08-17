@@ -30,7 +30,7 @@ ahrs_status_t ahrs_init(ahrs_t* ahrs, const ahrs_config_t* config)
 {
     if (ahrs == NULL || config == NULL)
     {
-        return AHRS_ERROR;
+        return AHRS_STATUS_ERROR;
     }
     
     // Initialize state variables
@@ -55,14 +55,14 @@ ahrs_status_t ahrs_init(ahrs_t* ahrs, const ahrs_config_t* config)
 
     ahrs->is_initialized = true;
     
-    return AHRS_OK;
+    return AHRS_STATUS_OK;
 }
 
 ahrs_status_t ahrs_predict(ahrs_t *ahrs, const vec3_t *gyro_rps, float dt)
 {
     if (ahrs == NULL || gyro_rps == NULL || dt <= 0.0f)
     {
-        return AHRS_ERROR;
+        return AHRS_STATUS_ERROR;
     }
 
     // Temporary matrices to use BSS section for performance
@@ -183,14 +183,14 @@ ahrs_status_t ahrs_predict(ahrs_t *ahrs, const vec3_t *gyro_rps, float dt)
     insert_3x3_block_into_6x6(&ahrs->P, &P_bt_new, 3, 0);
     insert_3x3_block_into_6x6(&ahrs->P, &P_bb_new, 3, 3);
 
-    return AHRS_OK;
+    return AHRS_STATUS_OK;
 }
 
-ahrs_status_t ahrs_update_accel(ahrs_t *ahrs, const vec3_t *accel_mps2, float dt)
+ahrs_status_t ahrs_update_accel(ahrs_t *ahrs, const vec3_t *accel_mps2)
 {
     if (ahrs == NULL || accel_mps2 == NULL)
     {
-        return AHRS_ERROR;
+        return AHRS_STATUS_ERROR;
     }
 
     // Declare static matrices to avoid repeated allocations
@@ -257,7 +257,6 @@ ahrs_status_t ahrs_update_accel(ahrs_t *ahrs, const vec3_t *accel_mps2, float dt
 
     /* Snapshot measurement: R is not integrated over dt. After normalize,
      * this is treated as variance of the unit-vector components. */
-    (void)dt;
     const float r_var = ahrs->config.accel_noise_density * ahrs->config.accel_noise_density;
     for (int i = 0; i < 3; ++i)
     {
@@ -267,7 +266,7 @@ ahrs_status_t ahrs_update_accel(ahrs_t *ahrs, const vec3_t *accel_mps2, float dt
     // Invert S (3x3 matrix)
     if (!mat3_inverse(&S, &S_inv))
     {
-        return AHRS_ERROR;
+        return AHRS_STATUS_ERROR;
     }
 
     // K = P H^T S^{-1} with H = [[g]×, 0], so H^T = [[g]×^T; 0]
@@ -374,5 +373,10 @@ ahrs_status_t ahrs_update_accel(ahrs_t *ahrs, const vec3_t *accel_mps2, float dt
         }
     }
 
-    return AHRS_OK;
+    return AHRS_STATUS_OK;
+}
+
+ahrs_status_t ahrs_update_mag(ahrs_t *ahrs, const vec3_t *mag_ut)
+{
+    return AHRS_STATUS_OK;
 }

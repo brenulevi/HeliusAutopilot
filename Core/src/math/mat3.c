@@ -109,3 +109,11 @@ bool mat3_inverse(const mat3_t *m, mat3_t *result)
 
     return true;
 }
+
+float mat3_det(const mat3_t *m)
+{
+    return
+      m->data[0][0] * (m->data[1][1] * m->data[2][2] - m->data[1][2] * m->data[2][1])
+    - m->data[0][1] * (m->data[1][0] * m->data[2][2] - m->data[1][2] * m->data[2][0])
+    + m->data[0][2] * (m->data[1][0] * m->data[2][1] - m->data[1][1] * m->data[2][0]);
+}

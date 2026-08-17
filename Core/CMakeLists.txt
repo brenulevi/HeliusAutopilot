@@ -4,7 +4,10 @@ add_library(helius_core STATIC
     src/math/mat6.c
     src/math/mat3.c
 
-    src/ahrs.c
+    src/estimator/ahrs.c
+
+    src/calibration.c
+    src/core.c
 )
 
 add_library(helius::core ALIAS helius_core)
@@ -15,6 +18,7 @@ target_include_directories(helius_core
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include/helius
         ${CMAKE_CURRENT_SOURCE_DIR}/include/helius/math
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/helius/estimator
 )
 
 target_link_libraries(helius_core
