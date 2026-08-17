@@ -1,15 +1,9 @@
-/*
- * mpu9250.h
- *
- *  Created on: 13 de ago. de 2026
- *      Author: breno
- */
-
-#ifndef DRIVERS_MPU9250_MPU9250_H_
-#define DRIVERS_MPU9250_MPU9250_H_
+#ifndef DRIVERS_MPU9250_H_
+#define DRIVERS_MPU9250_H_
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <helius/math/vec3.h>
 
 #include "i2c_protocol.h"
 #include "mpu9250_registers.h"
@@ -69,16 +63,8 @@ typedef struct
 
 typedef struct
 {
-    float x;
-    float y;
-    float z;
-
-} MPU9250_Vector3;
-
-typedef struct
-{
-    MPU9250_Vector3 accel_mps2;
-    MPU9250_Vector3 gyro_rps;
+    vec3_t accel_mps2;
+    vec3_t gyro_rps;
 
     float temperature_c;
 
@@ -101,6 +87,16 @@ MPU9250_Status mpu9250_init(
     MPU9250_Driver *driver,
     I2C_Protocol *i2c,
     uint16_t address
+);
+
+MPU9250_Status mpu9250_set_i2c_master(
+    MPU9250_Driver *driver,
+    bool enable
+);
+
+MPU9250_Status mpu9250_set_bypass(
+    MPU9250_Driver *driver,
+    bool enable
 );
 
 MPU9250_Status mpu9250_set_accel_range(
@@ -129,4 +125,4 @@ MPU9250_Status mpu9250_write_register(
     uint8_t data
 );
 
-#endif /* DRIVERS_MPU9250_MPU9250_H_ */
+#endif /* DRIVERS_MPU9250_H_ */

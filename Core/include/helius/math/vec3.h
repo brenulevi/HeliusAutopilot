@@ -1,5 +1,5 @@
-#ifndef HELIUS_MATH_VEC3_H
-#define HELIUS_MATH_VEC3_H
+#ifndef HELIUS_MATH_VEC3_H_
+#define HELIUS_MATH_VEC3_H_
 
 typedef struct
 {
@@ -17,4 +17,4 @@ float vec3_length(const vec3_t* v);
 void vec3_normalize(vec3_t* v);
 void vec3_zero(vec3_t* v);
 
-#endif // HELIUS_MATH_VEC3_H
+#endif // HELIUS_MATH_VEC3_H_

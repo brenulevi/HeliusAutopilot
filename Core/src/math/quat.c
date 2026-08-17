@@ -55,13 +55,31 @@ void quat_rotate_vector(const quat_t *q, const vec3_t *v, vec3_t *result)
     quat_t q_conj;
     quat_conjugate(q, &q_conj);
 
-    // Perform the rotation: result = q * v_quat * q_conj
+    // Perform the rotation: result = q * v_quat * q_conj  (body → inertial)
     quat_t temp;
     quat_multiply(q, &v_quat, &temp);
     quat_t rotated_quat;
     quat_multiply(&temp, &q_conj, &rotated_quat);
 
     // Extract the rotated vector from the resulting quaternion
+    result->x = rotated_quat.x;
+    result->y = rotated_quat.y;
+    result->z = rotated_quat.z;
+}
+
+void quat_rotate_vector_inverse(const quat_t *q, const vec3_t *v, vec3_t *result)
+{
+    quat_t v_quat = {0.0f, v->x, v->y, v->z};
+
+    quat_t q_conj;
+    quat_conjugate(q, &q_conj);
+
+    // result = q* * v * q  (inertial → body)
+    quat_t temp;
+    quat_multiply(&q_conj, &v_quat, &temp);
+    quat_t rotated_quat;
+    quat_multiply(&temp, q, &rotated_quat);
+
     result->x = rotated_quat.x;
     result->y = rotated_quat.y;
     result->z = rotated_quat.z;

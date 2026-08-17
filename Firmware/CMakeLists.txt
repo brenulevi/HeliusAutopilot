@@ -45,6 +45,8 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Drivers/MPU9250/mpu9250.c
+    Drivers/AK8963/ak8963.c
+    Drivers/GY91/gy91.c
     Drivers/Protocol/i2c_protocol.c
 )
 
@@ -52,6 +54,8 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     Drivers/MPU9250
     Drivers/Protocol
+    Drivers/AK8963
+    Drivers/GY91
 )
 
 # Add project symbols (macros)

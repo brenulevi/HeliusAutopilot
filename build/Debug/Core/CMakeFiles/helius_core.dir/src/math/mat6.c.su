@@ -1,5 +1,0 @@
-C:/Users/breno/Documents/HeliusAutopilot/Core/src/math/mat6.c:3:6:mat6_zero	24	static
-C:/Users/breno/Documents/HeliusAutopilot/Core/src/math/mat6.c:14:6:mat6_identity	24	static
-C:/Users/breno/Documents/HeliusAutopilot/Core/src/math/mat6.c:25:6:mat6_add	32	static
-C:/Users/breno/Documents/HeliusAutopilot/Core/src/math/mat6.c:36:6:mat6_multiply	40	static
-C:/Users/breno/Documents/HeliusAutopilot/Core/src/math/mat6.c:51:6:mat6_transpose	24	static

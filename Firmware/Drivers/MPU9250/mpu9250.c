@@ -1,19 +1,11 @@
-/*
- * mpu9250.c
- *
- *  Created on: 13 de ago. de 2026
- *      Author: breno
- */
-
 #include "mpu9250.h"
 #include "mpu9250_registers.h"
 
-#define MPU9250_PWR_MGMT_1_CLKSEL_XGYRO  0x01
+#define MPU9250_PWR_MGMT_1_CLKSEL_XGYRO 0x01
 
 static MPU9250_Status mpu9250_get_accel_scale(
     MPU9250_AccelRange range,
-    float *scale
-)
+    float *scale)
 {
     if (scale == NULL)
     {
@@ -22,31 +14,30 @@ static MPU9250_Status mpu9250_get_accel_scale(
 
     switch (range)
     {
-        case MPU9250_ACCEL_RANGE_2G:
-            *scale = 16384.0f;
-            return MPU9250_STATUS_OK;
+    case MPU9250_ACCEL_RANGE_2G:
+        *scale = 16384.0f;
+        return MPU9250_STATUS_OK;
 
-        case MPU9250_ACCEL_RANGE_4G:
-            *scale = 8192.0f;
-            return MPU9250_STATUS_OK;
+    case MPU9250_ACCEL_RANGE_4G:
+        *scale = 8192.0f;
+        return MPU9250_STATUS_OK;
 
-        case MPU9250_ACCEL_RANGE_8G:
-            *scale = 4096.0f;
-            return MPU9250_STATUS_OK;
+    case MPU9250_ACCEL_RANGE_8G:
+        *scale = 4096.0f;
+        return MPU9250_STATUS_OK;
 
-        case MPU9250_ACCEL_RANGE_16G:
-            *scale = 2048.0f;
-            return MPU9250_STATUS_OK;
+    case MPU9250_ACCEL_RANGE_16G:
+        *scale = 2048.0f;
+        return MPU9250_STATUS_OK;
 
-        default:
-            return MPU9250_STATUS_INVALID_PARAM;
+    default:
+        return MPU9250_STATUS_INVALID_PARAM;
     }
 }
 
 static MPU9250_Status mpu9250_get_gyro_scale(
     MPU9250_GyroRange range,
-    float *scale
-)
+    float *scale)
 {
     if (scale == NULL)
     {
@@ -55,36 +46,34 @@ static MPU9250_Status mpu9250_get_gyro_scale(
 
     switch (range)
     {
-        case MPU9250_GYRO_RANGE_250DPS:
-            *scale = 131.0f;
-            return MPU9250_STATUS_OK;
+    case MPU9250_GYRO_RANGE_250DPS:
+        *scale = 131.0f;
+        return MPU9250_STATUS_OK;
 
-        case MPU9250_GYRO_RANGE_500DPS:
-            *scale = 65.5f;
-            return MPU9250_STATUS_OK;
+    case MPU9250_GYRO_RANGE_500DPS:
+        *scale = 65.5f;
+        return MPU9250_STATUS_OK;
 
-        case MPU9250_GYRO_RANGE_1000DPS:
-            *scale = 32.8f;
-            return MPU9250_STATUS_OK;
+    case MPU9250_GYRO_RANGE_1000DPS:
+        *scale = 32.8f;
+        return MPU9250_STATUS_OK;
 
-        case MPU9250_GYRO_RANGE_2000DPS:
-            *scale = 16.4f;
-            return MPU9250_STATUS_OK;
+    case MPU9250_GYRO_RANGE_2000DPS:
+        *scale = 16.4f;
+        return MPU9250_STATUS_OK;
 
-        default:
-            return MPU9250_STATUS_INVALID_PARAM;
+    default:
+        return MPU9250_STATUS_INVALID_PARAM;
     }
 }
 
 static MPU9250_Status mpu9250_apply_accel_range(
     MPU9250_Driver *driver,
-    MPU9250_AccelRange range
-)
+    MPU9250_AccelRange range)
 {
     float scale;
 
-    if (mpu9250_get_accel_scale(range, &scale)
-        != MPU9250_STATUS_OK)
+    if (mpu9250_get_accel_scale(range, &scale) != MPU9250_STATUS_OK)
     {
         return MPU9250_STATUS_INVALID_PARAM;
     }
@@ -107,13 +96,11 @@ static MPU9250_Status mpu9250_apply_accel_range(
 
 static MPU9250_Status mpu9250_apply_gyro_range(
     MPU9250_Driver *driver,
-    MPU9250_GyroRange range
-)
+    MPU9250_GyroRange range)
 {
     float scale;
 
-    if (mpu9250_get_gyro_scale(range, &scale)
-        != MPU9250_STATUS_OK)
+    if (mpu9250_get_gyro_scale(range, &scale) != MPU9250_STATUS_OK)
     {
         return MPU9250_STATUS_INVALID_PARAM;
     }
@@ -135,8 +122,7 @@ static MPU9250_Status mpu9250_apply_gyro_range(
 }
 
 static MPU9250_Status mpu9250_set_clock(
-    MPU9250_Driver *driver
-)
+    MPU9250_Driver *driver)
 {
     if (mpu9250_write_register(
             driver,
@@ -150,8 +136,7 @@ static MPU9250_Status mpu9250_set_clock(
 }
 
 static MPU9250_Status mpu9250_configure(
-    MPU9250_Driver *driver
-)
+    MPU9250_Driver *driver)
 {
     uint8_t value;
 
@@ -245,11 +230,8 @@ static MPU9250_Status mpu9250_configure(
 MPU9250_Status mpu9250_init(
     MPU9250_Driver *driver,
     I2C_Protocol *i2c,
-    uint16_t address
-)
+    uint16_t address)
 {
-    uint8_t who_am_i;
-
     if (driver == NULL || i2c == NULL)
     {
         return MPU9250_STATUS_INVALID_PARAM;
@@ -260,30 +242,10 @@ MPU9250_Status mpu9250_init(
     driver->initialized = false;
 
     /*
-     * Default configuration
-     */
-    if (mpu9250_apply_accel_range(
-            driver,
-            MPU9250_ACCEL_RANGE_2G) != MPU9250_STATUS_OK)
-    {
-        return MPU9250_STATUS_ERROR;
-    }
-
-    if (mpu9250_apply_gyro_range(
-			driver,
-			MPU9250_GYRO_RANGE_250DPS) != MPU9250_STATUS_OK)
-	{
-		return MPU9250_STATUS_ERROR;
-	}
-
-    driver->config.dlpf =
-        MPU9250_DLPF_41HZ;
-
-    driver->config.sample_rate_hz = 1000;
-
-    /*
      * Check device identity.
      */
+    uint8_t who_am_i;
+
     if (mpu9250_read_register(
             driver,
             MPU9250_REG_WHO_AM_I,
@@ -296,6 +258,28 @@ MPU9250_Status mpu9250_init(
     {
         return MPU9250_STATUS_NOT_FOUND;
     }
+
+    /*
+     * Default configuration
+     */
+    if (mpu9250_apply_accel_range(
+            driver,
+            MPU9250_ACCEL_RANGE_2G) != MPU9250_STATUS_OK)
+    {
+        return MPU9250_STATUS_ERROR;
+    }
+
+    if (mpu9250_apply_gyro_range(
+            driver,
+            MPU9250_GYRO_RANGE_250DPS) != MPU9250_STATUS_OK)
+    {
+        return MPU9250_STATUS_ERROR;
+    }
+
+    driver->config.dlpf =
+        MPU9250_DLPF_41HZ;
+
+    driver->config.sample_rate_hz = 1000;
 
     /*
      * Reset device.
@@ -331,10 +315,87 @@ MPU9250_Status mpu9250_init(
     return MPU9250_STATUS_OK;
 }
 
+MPU9250_Status mpu9250_set_i2c_master(MPU9250_Driver *driver, bool enable)
+{
+    if (driver == NULL)
+    {
+        return MPU9250_STATUS_INVALID_PARAM;
+    }
+
+    if (!driver->initialized)
+    {
+        return MPU9250_STATUS_NOT_INITIALIZED;
+    }
+
+    uint8_t value;
+
+    if (mpu9250_read_register(driver, MPU9250_REG_USER_CTRL, &value) != MPU9250_STATUS_OK)
+    {
+        return MPU9250_STATUS_ERROR;
+    }
+
+    if (enable)
+    {
+        value |= MPU9250_USER_CTRL_I2C_MST_EN; // Set I2C_MST_EN bit
+    }
+    else
+    {
+        value &= ~MPU9250_USER_CTRL_I2C_MST_EN; // Clear I2C_MST_EN bit
+    }
+
+    if (mpu9250_write_register(
+            driver,
+            MPU9250_REG_USER_CTRL,
+            value) != MPU9250_STATUS_OK)
+    {
+        return MPU9250_STATUS_ERROR;
+    }
+
+    return MPU9250_STATUS_OK;
+}
+
+MPU9250_Status mpu9250_set_bypass(MPU9250_Driver *driver, bool enable)
+{
+    if (driver == NULL)
+    {
+        return MPU9250_STATUS_INVALID_PARAM;
+    }
+
+    if (!driver->initialized)
+    {
+        return MPU9250_STATUS_NOT_INITIALIZED;
+    }
+
+    uint8_t value;
+
+    if (mpu9250_read_register(driver, MPU9250_REG_INT_PIN_CFG, &value) != MPU9250_STATUS_OK)
+    {
+        return MPU9250_STATUS_ERROR;
+    }
+
+    if (enable)
+    {
+        value |= MPU9250_INT_PIN_CFG_BYPASS_EN; // Set BYPASS_EN bit
+    }
+    else
+    {
+        value &= ~MPU9250_INT_PIN_CFG_BYPASS_EN; // Clear BYPASS_EN bit
+    }
+
+    if (mpu9250_write_register(
+            driver,
+            MPU9250_REG_INT_PIN_CFG,
+            value) != MPU9250_STATUS_OK)
+    {
+        return MPU9250_STATUS_ERROR;
+    }
+
+    return MPU9250_STATUS_OK;
+}
+
 MPU9250_Status mpu9250_set_accel_range(
     MPU9250_Driver *driver,
-    MPU9250_AccelRange range
-)
+    MPU9250_AccelRange range)
 {
     if (driver == NULL)
     {
@@ -351,25 +412,23 @@ MPU9250_Status mpu9250_set_accel_range(
 
 MPU9250_Status mpu9250_set_gyro_range(
     MPU9250_Driver *driver,
-    MPU9250_GyroRange range
-)
+    MPU9250_GyroRange range)
 {
-	if (driver == NULL)
-	{
-		return MPU9250_STATUS_INVALID_PARAM;
-	}
+    if (driver == NULL)
+    {
+        return MPU9250_STATUS_INVALID_PARAM;
+    }
 
-	if (!driver->initialized)
-	{
-		return MPU9250_STATUS_NOT_INITIALIZED;
-	}
+    if (!driver->initialized)
+    {
+        return MPU9250_STATUS_NOT_INITIALIZED;
+    }
 
-	return mpu9250_apply_gyro_range(driver, range);
+    return mpu9250_apply_gyro_range(driver, range);
 }
 
 MPU9250_Status mpu9250_read_data(
-    MPU9250_Driver *driver
-)
+    MPU9250_Driver *driver)
 {
     uint8_t buffer[14];
 
@@ -406,16 +465,16 @@ MPU9250_Status mpu9250_read_data(
     int16_t accel_z =
         (int16_t)((buffer[4] << 8) | buffer[5]);
 
-	 const float gravity = 9.80665f;
+    const float gravity = 9.80665f;
 
-	 driver->data.accel_mps2.x =
-		 ((float)accel_x / driver->config.accel_lsb_per_g) * gravity;
+    driver->data.accel_mps2.x =
+        ((float)accel_x / driver->config.accel_lsb_per_g) * gravity;
 
-	 driver->data.accel_mps2.y =
-		 ((float)accel_y / driver->config.accel_lsb_per_g) * gravity;
+    driver->data.accel_mps2.y =
+        ((float)accel_y / driver->config.accel_lsb_per_g) * gravity;
 
-	 driver->data.accel_mps2.z =
-		 ((float)accel_z / driver->config.accel_lsb_per_g) * gravity;
+    driver->data.accel_mps2.z =
+        ((float)accel_z / driver->config.accel_lsb_per_g) * gravity;
 
     /*
      * TEMPERATURE
@@ -425,7 +484,7 @@ MPU9250_Status mpu9250_read_data(
         (int16_t)((buffer[6] << 8) | buffer[7]);
 
     driver->data.temperature_c =
-                ((float)temperature / 333.87f) + 21.0f;
+        ((float)temperature / 333.87f) + 21.0f;
 
     /*
      * GYRO
@@ -440,25 +499,24 @@ MPU9250_Status mpu9250_read_data(
     int16_t gyro_z =
         (int16_t)((buffer[12] << 8) | buffer[13]);
 
-   const float deg_to_rad = 0.017453292519943295f;
+    const float deg_to_rad = 0.017453292519943295f;
 
-   driver->data.gyro_rps.x =
-	   ((float)gyro_x / driver->config.gyro_lsb_per_dps) * deg_to_rad;
+    driver->data.gyro_rps.x =
+        ((float)gyro_x / driver->config.gyro_lsb_per_dps) * deg_to_rad;
 
-   driver->data.gyro_rps.y =
-	   ((float)gyro_y / driver->config.gyro_lsb_per_dps) * deg_to_rad;
+    driver->data.gyro_rps.y =
+        ((float)gyro_y / driver->config.gyro_lsb_per_dps) * deg_to_rad;
 
-   driver->data.gyro_rps.z =
-	   ((float)gyro_z / driver->config.gyro_lsb_per_dps) * deg_to_rad;
+    driver->data.gyro_rps.z =
+        ((float)gyro_z / driver->config.gyro_lsb_per_dps) * deg_to_rad;
 
-   return MPU9250_STATUS_OK;
+    return MPU9250_STATUS_OK;
 }
 
 MPU9250_Status mpu9250_read_register(
     MPU9250_Driver *driver,
     uint8_t reg,
-    uint8_t *data
-)
+    uint8_t *data)
 {
     if (driver == NULL ||
         driver->i2c == NULL ||
@@ -474,8 +532,7 @@ MPU9250_Status mpu9250_read_register(
         driver->address,
         reg,
         data,
-        1
-    );
+        1);
 
     if (status != I2C_PROTOCOL_OK)
     {
@@ -488,8 +545,7 @@ MPU9250_Status mpu9250_read_register(
 MPU9250_Status mpu9250_write_register(
     MPU9250_Driver *driver,
     uint8_t reg,
-    uint8_t data
-)
+    uint8_t data)
 {
     if (driver == NULL ||
         driver->i2c == NULL)
@@ -504,8 +560,7 @@ MPU9250_Status mpu9250_write_register(
         driver->address,
         reg,
         &data,
-        1
-    );
+        1);
 
     if (status != I2C_PROTOCOL_OK)
     {

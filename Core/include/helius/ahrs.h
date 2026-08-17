@@ -1,5 +1,5 @@
-#ifndef HELIUS_AHRS_H
-#define HELIUS_AHRS_H
+#ifndef HELIUS_AHRS_H_
+#define HELIUS_AHRS_H_
 
 #include <stdbool.h>
 
@@ -40,4 +40,4 @@ ahrs_status_t ahrs_init(ahrs_t *ahrs, const ahrs_config_t *config);
 ahrs_status_t ahrs_predict(ahrs_t *ahrs, const vec3_t *gyro_rps, float dt);
 ahrs_status_t ahrs_update_accel(ahrs_t *ahrs, const vec3_t *accel_mps2, float dt);
 
-#endif // HELIUS_AHRS_H
+#endif // HELIUS_AHRS_H_

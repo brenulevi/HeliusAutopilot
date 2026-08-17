@@ -25,7 +25,7 @@
 #include "usbd_cdc.h"
 #include "usbd_cdc_if.h"
 #include "i2c_protocol.h"
-#include "mpu9250.h"
+#include "gy91.h"
 #include "helius/ahrs.h"
 /* USER CODE END Includes */
 
@@ -38,8 +38,12 @@
 /* USER CODE BEGIN PD */
 #define GYRO_RATE_HZ 1000U
 #define ACCEL_RATE_HZ 100U
-#define LOG_RATE_HZ 20U
+#define MAG_RATE_HZ 100U
+#define LOG_RATE_HZ 50U
 #define RAD_TO_DEG (180.0f / 3.14159265358979323846f)
+
+#define MPU9250_ADDRESS (0x68 << 1) // Shifted left for HAL I2C
+#define AK8963_ADDRESS (0x0C << 1)	// Shifted left for HAL I2C
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -59,6 +63,10 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
+/* USER CODE END PFP */
+
+/* Private user code ---------------------------------------------------------*/
+/* USER CODE BEGIN 0 */
 int _write(int file, char *ptr, int len)
 {
 	uint32_t timeout = HAL_GetTick() + 100;
@@ -71,10 +79,7 @@ int _write(int file, char *ptr, int len)
 
 	return len;
 }
-/* USER CODE END PFP */
 
-/* Private user code ---------------------------------------------------------*/
-/* USER CODE BEGIN 0 */
 static void DWT_CycleCounter_Init(void)
 {
 	CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
@@ -120,7 +125,13 @@ int main(void)
 	MX_I2C1_Init();
 	MX_USB_DEVICE_Init();
 	/* USER CODE BEGIN 2 */
+
 	HAL_Delay(1000); // Wait for USB enumeration to complete
+
+	printf(
+		"after init: state=%lu error=0x%08lX\r\n",
+		(uint32_t)HAL_I2C_GetState(&hi2c1),
+		HAL_I2C_GetError(&hi2c1));
 
 	I2C_Protocol i2c_protocol;
 	if (i2c_protocol_init(&i2c_protocol, &hi2c1, 1000) != I2C_PROTOCOL_OK)
@@ -129,16 +140,21 @@ int main(void)
 		return -1;
 	}
 
+	printf(
+		"after init: state=%lu error=0x%08lX\r\n",
+		(uint32_t)HAL_I2C_GetState(&hi2c1),
+		HAL_I2C_GetError(&hi2c1));
+
 	printf("I2C protocol initialized successfully.\n");
 
-	MPU9250_Driver mpu9250;
-	if (mpu9250_init(&mpu9250, &i2c_protocol, 0x68 << 1) != MPU9250_STATUS_OK)
+	GY91_Driver gy91;
+	if (gy91_init(&gy91, &i2c_protocol, MPU9250_ADDRESS, AK8963_ADDRESS) != GY91_STATUS_OK)
 	{
-		printf("MPU9250 initialization failed!\n");
+		printf("GY91 initialization failed!\n");
 		return -1;
 	}
 
-	printf("MPU9250 initialized successfully.\n");
+	printf("GY91 initialized successfully.\n");
 
 	ahrs_t ahrs;
 	ahrs_config_t ahrs_config = {
@@ -161,6 +177,7 @@ int main(void)
 	/* USER CODE BEGIN WHILE */
 	const uint32_t gyro_period_cycles = SystemCoreClock / GYRO_RATE_HZ;
 	const uint32_t accel_divider = GYRO_RATE_HZ / ACCEL_RATE_HZ;
+	const uint32_t mag_divider = GYRO_RATE_HZ / MAG_RATE_HZ;
 	const uint32_t log_divider = GYRO_RATE_HZ / LOG_RATE_HZ;
 	uint32_t last_gyro_cycle = DWT->CYCCNT;
 	uint32_t next_gyro_cycle = last_gyro_cycle + gyro_period_cycles;
@@ -188,43 +205,74 @@ int main(void)
 			next_gyro_cycle += gyro_period_cycles;
 		} while ((int32_t)(sample_cycle - next_gyro_cycle) >= 0);
 
-		if (mpu9250_read_data(&mpu9250) == MPU9250_STATUS_OK)
+		if (gy91_read_mpu9250_data(&gy91) != GY91_STATUS_OK)
 		{
-			vec3_t gyro_measurement = {
-				.x = mpu9250.data.gyro_rps.x,
-				.y = mpu9250.data.gyro_rps.y,
-				.z = mpu9250.data.gyro_rps.z};
-			(void)ahrs_predict(&ahrs, &gyro_measurement, gyro_dt);
+			continue;
+		}
 
-			gyro_count++;
-			if ((gyro_count % accel_divider) == 0U)
+		/* -----------------------------------------------------
+		 * Gyroscope / prediction - 1000 Hz
+		 * ----------------------------------------------------- */
+
+		(void)ahrs_predict(
+			&ahrs,
+			&gy91.mpu9250.data.gyro_rps,
+			gyro_dt);
+
+		gyro_count++;
+
+		/* -----------------------------------------------------
+		 * Accelerometer correction - 100 Hz
+		 * ----------------------------------------------------- */
+
+		if ((gyro_count % accel_divider) == 0U)
+		{
+			(void)ahrs_update_accel(
+				&ahrs,
+				&gy91.mpu9250.data.accel_mps2,
+				1.0f / (float)ACCEL_RATE_HZ);
+		}
+
+		/* -----------------------------------------------------
+		 * Magnetometer correction - 100 Hz
+		 * ----------------------------------------------------- */
+
+		if ((gyro_count % mag_divider) == 0U)
+		{
+			if (gy91_read_ak8963_data(&gy91) == GY91_STATUS_OK)
 			{
-				vec3_t accel_measurement = {
-					.x = mpu9250.data.accel_mps2.x,
-					.y = mpu9250.data.accel_mps2.y,
-					.z = mpu9250.data.accel_mps2.z};
-				(void)ahrs_update_accel(&ahrs, &accel_measurement,
-										1.0f / (float)ACCEL_RATE_HZ);
+				// futuramente:
+				// (void)ahrs_update_mag(&ahrs, &mag_body);
 			}
+		}
 
-			if ((gyro_count % log_divider) == 0U)
+		/* -----------------------------------------------------
+		 * Logging - 20 Hz
+		 * ----------------------------------------------------- */
+
+		if ((gyro_count % log_divider) == 0U)
+		{
+			char msg[128];
+
+			int len = snprintf(
+				msg,
+				sizeof(msg),
+				"%.4f\t%.4f\t%.4f\t"
+				"%.4f\t%.4f\t%.4f\r\n",
+
+				gy91.data.accel_mps2.x,
+				gy91.data.accel_mps2.y,
+				gy91.data.accel_mps2.z,
+
+				gy91.data.mag_ut.x,
+				gy91.data.mag_ut.y,
+				gy91.data.mag_ut.z);
+
+			if (len > 0)
 			{
-				vec3_t euler_angles;
-				quat_to_euler(&ahrs.orientation, &euler_angles);
-
-				char msg[96];
-				int len = snprintf(msg, sizeof(msg), "%.4f\t%.4f\t%.4f\t%.4f\t%.4f\t%.4f\r\n",
-								   euler_angles.x,
-								   euler_angles.y,
-								   euler_angles.z,
-								   ahrs.gyro_bias.x,
-								   ahrs.gyro_bias.y,
-								   ahrs.gyro_bias.z);
-
-				if (len > 0)
-				{
-					(void)CDC_Transmit_FS((uint8_t *)msg, (uint16_t)len);
-				}
+				(void)CDC_Transmit_FS(
+					(uint8_t *)msg,
+					(uint16_t)len);
 			}
 		}
 		/* USER CODE END WHILE */

@@ -1,10 +1,3 @@
-/*
- * i2c_protocol.c
- *
- *  Created on: 13 de ago. de 2026
- *      Author: breno
- */
-
 #include "i2c_protocol.h"
 
 static I2C_ProtocolStatus get_status(HAL_StatusTypeDef hal_status)

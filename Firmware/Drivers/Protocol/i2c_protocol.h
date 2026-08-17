@@ -1,12 +1,5 @@
-/*
- * i2c_protocol.h
- *
- *  Created on: 13 de ago. de 2026
- *      Author: breno
- */
-
-#ifndef DRIVERS_PROTOCOL_I2C_PROTOCOL_H_
-#define DRIVERS_PROTOCOL_I2C_PROTOCOL_H_
+#ifndef DRIVERS_I2C_PROTOCOL_H_
+#define DRIVERS_I2C_PROTOCOL_H_
 
 #include <stm32f4xx_hal.h>
 
@@ -46,4 +39,4 @@ I2C_ProtocolStatus i2c_protocol_write(
     uint16_t size
 );
 
-#endif /* DRIVERS_PROTOCOL_I2C_PROTOCOL_H_ */
+#endif /* DRIVERS_I2C_PROTOCOL_H_ */

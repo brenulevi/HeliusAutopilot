@@ -1,12 +1,5 @@
-/*
- * mpu9250_registers.h
- *
- *  Created on: 13 de ago. de 2026
- *      Author: breno
- */
-
-#ifndef DRIVERS_MPU9250_MPU9250_REGISTERS_H_
-#define DRIVERS_MPU9250_MPU9250_REGISTERS_H_
+#ifndef DRIVERS_MPU9250_REGISTERS_H_
+#define DRIVERS_MPU9250_REGISTERS_H_
 
 /* Device identification */
 #define MPU9250_REG_WHO_AM_I             0x75
@@ -18,6 +11,9 @@
 
 /* User control */
 #define MPU9250_REG_USER_CTRL            0x6A
+#define MPU9250_USER_CTRL_I2C_MST_EN     0x20
+#define MPU9250_REG_INT_PIN_CFG          0x37
+#define MPU9250_INT_PIN_CFG_BYPASS_EN    0x02
 
 /* Configuration */
 #define MPU9250_REG_CONFIG               0x1A
@@ -56,4 +52,4 @@
 /* Device reset */
 #define MPU9250_PWR_MGMT_1_DEVICE_RESET  0x80
 
-#endif /* DRIVERS_MPU9250_MPU9250_REGISTERS_H_ */
+#endif /* DRIVERS_MPU9250_REGISTERS_H_ */

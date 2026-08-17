@@ -209,10 +209,12 @@ ahrs_status_t ahrs_update_accel(ahrs_t *ahrs, const vec3_t *accel_mps2, float dt
     vec3_t accel_normalized = *accel_mps2;
     vec3_normalize(&accel_normalized);
 
-    // Get the expected gravity direction in the body frame based on the current orientation
+    /* q maps body → inertial (right-multiply with body-frame δq).
+     * Expected accelerometer direction is gravity in the body frame:
+     * g_body = q* ⊗ g_inertial ⊗ q */
     vec3_t gravity_body;
-    const vec3_t gravity_inertial = {0.0f, 0.0f, 1.0f}; // Gravity vector in the inertial frame
-    quat_rotate_vector(&ahrs->orientation, &gravity_inertial, &gravity_body);
+    const vec3_t gravity_inertial = {0.0f, 0.0f, 1.0f};
+    quat_rotate_vector_inverse(&ahrs->orientation, &gravity_inertial, &gravity_body);
 
     // Compute the innovation (y = z - h) for the accelerometer measurement
     vec3_t innovation;
@@ -233,14 +235,12 @@ ahrs_status_t ahrs_update_accel(ahrs_t *ahrs, const vec3_t *accel_mps2, float dt
     a_skew.data[2][1] = gravity_body.x;
     a_skew.data[2][2] = 0.0f;
 
-    // H = [-a_skew, 0]
-
-    // Fill in the H matrix
+    /* g_body_true ≈ g_body + [g_body]× δθ  for q_true = q ⊗ δq, so H_θ = +[g]× */
     for (int i = 0; i < 3; ++i)
     {
         for (int j = 0; j < 3; ++j)
         {
-            H.data[i][j] = -a_skew.data[i][j];
+            H.data[i][j] = a_skew.data[i][j];
             H.data[i][j + 3] = 0.0f;
         }
     }
@@ -249,7 +249,7 @@ ahrs_status_t ahrs_update_accel(ahrs_t *ahrs, const vec3_t *accel_mps2, float dt
     // H * P * H^T affects only the top-left 3x3 block of P, so we can compute it directly
     extract_3x3_block_from_6x6(&ahrs->P, &P_tt, 0, 0);
 
-    // Compute (-a_skew) * P_tt * (-a_skew)^T
+    // S_θθ = [g]× P_tt [g]×^T  (sign of H cancels in H P H^T)
     mat3_multiply(&a_skew, &P_tt, &temp_sp);
 
     mat3_transpose(&a_skew, &a_skew_T);
@@ -270,38 +270,16 @@ ahrs_status_t ahrs_update_accel(ahrs_t *ahrs, const vec3_t *accel_mps2, float dt
         return AHRS_ERROR;
     }
 
-    // Compute the Kalman gain K = P * H^T * S_inv
-    // Since H has the form [-a_skew, 0], H^T has the form [-a_skew^T; 0]
-    // Therefore, K = P * H^T * S_inv affects only the top-left 3x3 block of P, and the top-right 3x3 block will be zero.
+    // K = P H^T S^{-1} with H = [[g]×, 0], so H^T = [[g]×^T; 0]
     extract_3x3_block_from_6x6(&ahrs->P, &P_tt, 0, 0);
     extract_3x3_block_from_6x6(&ahrs->P, &P_bt, 3, 0);
 
-    // Compute K_tt = -P_tt * a_skew^T * S_inv
+    // K_tt = P_tt * a_skew^T * S_inv
     mat3_multiply(&P_tt, &a_skew_T, &Ptt_St);
-
-    // Multiply by -1
-    for (int i = 0; i < 3; ++i)
-    {
-        for (int j = 0; j < 3; ++j)
-        {
-            Ptt_St.data[i][j] = -Ptt_St.data[i][j];
-        }
-    }
-
     mat3_multiply(&Ptt_St, &S_inv, &temp_Ktt);
 
-    // Compute inferior block: K_bb = -P_bt * a_skew^T * S_inv
+    // K_bb = P_bt * a_skew^T * S_inv
     mat3_multiply(&P_bt, &a_skew_T, &Pbt_St);
-
-    // Multiply by -1
-    for (int i = 0; i < 3; ++i)
-    {
-        for (int j = 0; j < 3; ++j)
-        {
-            Pbt_St.data[i][j] = -Pbt_St.data[i][j];
-        }
-    }
-
     mat3_multiply(&Pbt_St, &S_inv, &temp_Kbb);
 
     // Update the state estimate: x = x + K * y
@@ -338,8 +316,7 @@ ahrs_status_t ahrs_update_accel(ahrs_t *ahrs, const vec3_t *accel_mps2, float dt
     // Update the error covariance matrix using the Joseph form:
     // P = (I - K * H) * P * (I - K * H)^T + K * R * K^T
 
-    // Compute (I - K * H)
-    // Since H has the form [-a_skew, 0], we can compute K * H efficiently.
+    // I - K H, with H = [[g]×, 0] so KH occupies the first three columns
     mat3_multiply(&temp_Ktt, &a_skew, &Ktt_askew);
     mat3_multiply(&temp_Kbb, &a_skew, &Kbb_askeew);
 
@@ -349,10 +326,8 @@ ahrs_status_t ahrs_update_accel(ahrs_t *ahrs, const vec3_t *accel_mps2, float dt
     {
         for (int j = 0; j < 3; ++j)
         {
-            // Subtract K * H from the identity matrix
-            // H has -a_skew, the term - (K * H) becomes K * a_skew
-            I_minus_KH.data[i][j] += Ktt_askew.data[i][j];
-            I_minus_KH.data[i + 3][j] += Kbb_askeew.data[i][j];
+            I_minus_KH.data[i][j] -= Ktt_askew.data[i][j];
+            I_minus_KH.data[i + 3][j] -= Kbb_askeew.data[i][j];
         }
     }
 

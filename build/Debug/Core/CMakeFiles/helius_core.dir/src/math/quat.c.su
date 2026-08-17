@@ -1,6 +1,0 @@
-C:/Users/breno/Documents/HeliusAutopilot/Core/src/math/quat.c:5:6:quat_multiply	24	static
-C:/Users/breno/Documents/HeliusAutopilot/Core/src/math/quat.c:13:6:quat_conjugate	16	static
-C:/Users/breno/Documents/HeliusAutopilot/Core/src/math/quat.c:21:6:quat_normalize	24	static
-C:/Users/breno/Documents/HeliusAutopilot/Core/src/math/quat.c:41:6:quat_identity	16	static
-C:/Users/breno/Documents/HeliusAutopilot/Core/src/math/quat.c:49:6:quat_rotate_vector	88	static
-C:/Users/breno/Documents/HeliusAutopilot/Core/src/math/quat.c:70:6:quat_to_euler	40	static

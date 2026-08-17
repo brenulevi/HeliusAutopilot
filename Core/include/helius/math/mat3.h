@@ -1,5 +1,5 @@
-#ifndef HELIUS_MATH_MAT3_H
-#define HELIUS_MATH_MAT3_H
+#ifndef HELIUS_MATH_MAT3_H_
+#define HELIUS_MATH_MAT3_H_
 
 #include <stdbool.h>
 
@@ -16,4 +16,4 @@ void mat3_transpose(const mat3_t* m, mat3_t* result);
 void mat3_copy(const mat3_t* src, mat3_t* dest);
 bool mat3_inverse(const mat3_t* m, mat3_t* result);
 
-#endif // HELIUS_MATH_MAT3_H
+#endif // HELIUS_MATH_MAT3_H_

@@ -1,4 +1,0 @@
-C:/Users/breno/Documents/HeliusAutopilot/Firmware/Drivers/Protocol/i2c_protocol.c:10:27:get_status	16	static
-C:/Users/breno/Documents/HeliusAutopilot/Firmware/Drivers/Protocol/i2c_protocol.c:28:20:i2c_protocol_init	24	static
-C:/Users/breno/Documents/HeliusAutopilot/Firmware/Drivers/Protocol/i2c_protocol.c:43:20:i2c_protocol_read	48	static
-C:/Users/breno/Documents/HeliusAutopilot/Firmware/Drivers/Protocol/i2c_protocol.c:72:20:i2c_protocol_write	48	static
